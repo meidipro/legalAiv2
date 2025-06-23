@@ -5,14 +5,13 @@ import { auth } from '../auth';
 // --- TYPE DEFINITIONS ---
 type Sender = 'user' | 'ai';
 interface Message { sender: Sender; text: string; }
-interface Conversation { id: string; title: string; messages: Message[]; created_at?: string; user_id?: string; }
+interface Conversation { id: string; title: string; messages: Message[]; created_at?: string; user_id?: string; dify_conversation_id?: string; }
 interface AppState { conversations: Conversation[]; activeConversationId: string | null; }
 
 // --- The Main Export Function ---
 export function renderAppPage(container: HTMLElement) {
 
   // --- CONFIGURATION ---
-  // This is the one and only declaration for the Dify API Key.
   const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY;
   const GUEST_STORAGE_KEY = 'legalAI.guestConversations';
   
@@ -106,13 +105,23 @@ export function renderAppPage(container: HTMLElement) {
       if (activeConvo) activeConvo.messages.forEach(msg => displayMessage(msg.text, msg.sender));
       chatWindow.scrollTop = chatWindow.scrollHeight;
   }
+  
+  // ===================================================================
+  // ===== THE CORRECTED FUNCTION WITH AI ICON =========================
+  // ===================================================================
   function displayMessage(text: string, sender: Sender) {
       const messageWrapper = document.createElement('div');
       messageWrapper.className = `message-wrapper ${sender}`;
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
-      avatar.textContent = sender === 'ai' ? 'AI' : 'You';
-      if(sender === 'user') avatar.classList.add('user-avatar');
+      
+      if(sender === 'user') {
+          avatar.classList.add('user-avatar');
+          avatar.textContent = 'You';
+      } else {
+          avatar.classList.add('ai-avatar');
+          avatar.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg>`;
+      }
       const messageContent = document.createElement('div');
       messageContent.className = 'message-content';
       const senderName = document.createElement('div');
@@ -201,7 +210,7 @@ export function renderAppPage(container: HTMLElement) {
           setTimeout(() => { button.innerHTML = originalContent; button.disabled = false; }, 2000);
       }).catch(err => { console.error('Failed to copy chat:', err); alert('Failed to copy chat.'); });
   }
-  async function addMessageToActiveConversation(message: Message) {
+  async function addMessageToActiveConversation(message: Message, difyConversationId?: string) {
       const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
       if (!activeConvo) return;
       activeConvo.messages.push(message);
@@ -210,33 +219,31 @@ export function renderAppPage(container: HTMLElement) {
           newTitle = message.text.substring(0, 25) + (message.text.length > 25 ? '...' : '');
       }
       activeConvo.title = newTitle;
+      if (difyConversationId) {
+          activeConvo.dify_conversation_id = difyConversationId;
+      }
       if (isGuestMode) {
           localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
       } else {
-          const { error } = await supabase.from('conversations').update({ messages: activeConvo.messages, title: newTitle }).eq('id', activeConvo.id);
+          const { error } = await supabase.from('conversations').update({ 
+              messages: activeConvo.messages, 
+              title: newTitle,
+              dify_conversation_id: activeConvo.dify_conversation_id 
+          }).eq('id', activeConvo.id);
           if (error) console.error("Error saving message:", error);
       }
       renderSidebar();
       renderChatWindow();
   }
   
-  // ===================================================================
-  // ===== THE CORRECTED FUNCTION ======================================
-  // ===================================================================
   async function handleFormSubmit() {
     const userInput = messageInput.value.trim();
-    
-    // Check for the Dify API key from the outer scope.
-    // The redundant local declaration has been REMOVED.
-    if (!userInput || !DIFY_API_KEY) {
-        if(!DIFY_API_KEY) {
-            alert("Dify API Key is not configured. Please add VITE_DIFY_API_KEY to your .env.local file.");
-        }
+    if (!DIFY_API_KEY) {
+        alert("Dify API Key is not configured in .env.local file.");
         return;
     }
-
+    if (!userInput) return;
     if (!appState.activeConversationId) await createNewConversation();
-    
     const selectedRole = roleSelector.value;
     const userIdentifier = auth.getUserId() || `guest_${Date.now()}`;
     const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
@@ -250,24 +257,26 @@ export function renderAppPage(container: HTMLElement) {
     const tempLastBubble = tempBubbles[tempBubbles.length -1];
 
     try {
-        const response = await fetch('https://api.dify.ai/v1/chat-messages', {
+        const difyConversationId = activeConvo.dify_conversation_id || undefined;
+        const DIFY_CHAT_URL = 'https://api.dify.ai/v1/chat-messages';
+
+        const response = await fetch(DIFY_CHAT_URL, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${DIFY_API_KEY}`, // Uses the key from the outer scope
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                inputs: { "USER_ROLE": selectedRole },
+                inputs: { "USER_ROLE": selectedRole, "LANGUAGE": "English" },
                 query: userInput,
                 user: userIdentifier, 
-                conversation_id: activeConvo.id,
+                conversation_id: difyConversationId,
                 response_mode: 'streaming' 
             })
         });
 
-        if (!response.ok || !response.body) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
         }
+        if (!response.body) { throw new Error("API response was successful but had no body."); }
         
         tempLastBubble.remove();
         
@@ -275,6 +284,7 @@ export function renderAppPage(container: HTMLElement) {
         const decoder = new TextDecoder();
         let done = false;
         let fullResponse = "";
+        let finalDifyConversationId = difyConversationId;
 
         displayMessage("", 'ai');
         const aiBubbles = chatWindow.querySelectorAll('.message-wrapper.ai .message-bubble');
@@ -290,31 +300,23 @@ export function renderAppPage(container: HTMLElement) {
                     const jsonStr = line.substring(6);
                     if (jsonStr.trim() === '[DONE]') continue;
                     const parsed = JSON.parse(jsonStr);
+                    if (parsed.conversation_id) { finalDifyConversationId = parsed.conversation_id; }
                     if (parsed.event === 'agent_message' || parsed.event === 'message') {
                         fullResponse += parsed.answer;
                         aiLastBubble.innerText = fullResponse;
                         chatWindow.scrollTop = chatWindow.scrollHeight;
                     }
-                } catch (e) {
-                    // This can happen if a chunk cuts off a JSON object.
-                    // It's generally safe to ignore in a streaming context.
-                }
+                } catch (e) { /* Ignore parsing errors */ }
             }
         }
 
-        await addMessageToActiveConversation({ sender: 'ai', text: fullResponse });
+        await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
 
     } catch (error) {
+        console.error("Dify API Error:", error);
         tempLastBubble?.remove();
-        await addMessageToActiveConversation({ sender: 'ai', text: `Sorry, an error occurred with the AI service: ${error instanceof Error ? error.message : 'Unknown error'}` });
+        await addMessageToActiveConversation({ sender: 'ai', text: `Sorry, an error occurred: ${error instanceof Error ? error.message : 'Unknown error'}` });
     }
-  }
-  
-  // This function is kept for reference but is not directly used in the Dify API call.
-  // This resolves any "unused function" warnings from the linter.
-  function getSystemPrompt(role: string): string {
-      if (role) return `Role is set to ${role}`;
-      return `Default system prompt.`;
   }
 
   // --- APP INITIALIZATION ---
@@ -325,22 +327,11 @@ export function renderAppPage(container: HTMLElement) {
           themeText.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
       });
       newChatBtn.addEventListener('click', createNewConversation);
-
-      // This call prevents an "unused function" warning for getSystemPrompt
-      getSystemPrompt(""); 
-
-      if (isGuestMode) {
-          const guestNotice = document.createElement('div');
-          guestNotice.style.cssText = 'background-color: var(--bg-accent); color: var(--text-secondary); padding: 8px; text-align: center; font-size: 14px;';
-          guestNotice.innerHTML = `You are in Guest Mode. <a href="/login" data-link>Sign In</a> to save history.`;
-          document.querySelector('.sidebar')?.prepend(guestNotice);
-      }
       
       await loadState();
       renderSidebar();
       renderChatWindow();
   }
 
-  // Start the application for this page
   initApp();
 }

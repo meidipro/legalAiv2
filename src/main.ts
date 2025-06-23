@@ -1,54 +1,62 @@
 // src/main.ts
 import './style.css'
 import { supabase } from './supabaseClient';
-import { auth } from './auth'; // Import our new auth store
+import { auth } from './auth';
 import { renderNavbar } from './components/navbar';
 import { renderLandingPage } from './pages/landing';
 import { renderAboutPage } from './pages/about';
 import { renderLoginPage } from './pages/login';
 import { renderAppPage } from './pages/app';
+import { renderUserProfilePage } from './pages/user-profile'; // <-- IMPORT THE NEW PAGE
 
 const appContainer = document.getElementById('app') as HTMLElement;
 const navbarContainer = document.getElementById('navbar-container') as HTMLElement;
 
+// Add the new route
 const routes: { [key: string]: (container: HTMLElement) => void } = {
   '/': renderLandingPage,
   '/about': renderAboutPage,
   '/login': renderLoginPage,
   '/app': renderAppPage,
+  '/profile': renderUserProfilePage, // <-- ADD THE PROFILE ROUTE
 };
 
-const router = () => {
-  const path = window.location.pathname;
-  // NO MORE ROUTE GUARDING! We will let the app page handle it.
-  const renderPage = routes[path] || routes['/'];
+const router = async () => {
+  let path = window.location.pathname;
+  if (path === "") path = "/";
+
+  // --- ROUTE GUARDING for protected pages ---
+  const session = auth.getSession();
+  const protectedRoutes = ['/app', '/profile'];
+  
+  if (!session && protectedRoutes.includes(path)) {
+      history.pushState(null, '', '/login');
+      path = '/login';
+  }
+
+  const renderPage = routes[path] || routes['/']; // Default to landing page
   renderPage(appContainer);
 };
 
 // AUTH STATE LISTENER
-supabase.auth.onAuthStateChange((event, session) => {
-    // Update our shared state whenever auth changes
+supabase.auth.onAuthStateChange((_event, session) => {
     auth.setSession(session);
-    // Re-render the navbar to show the correct state (Sign In vs. Sign Out)
     renderNavbar(navbarContainer);
-
-    if (event === 'SIGNED_IN') {
-        history.pushState(null, '', '/app');
-        router();
-    }
-    if (event === 'SIGNED_OUT') {
-        history.pushState(null, '', '/');
-        router();
-    }
+    // After login/logout, re-route to ensure correct page is shown
+    router();
 });
 
 // INITIAL LOAD
 document.addEventListener('DOMContentLoaded', async () => {
-  // Wait for the initial session to be set before rendering the navbar
+  // Wait for the initial session to be set from Supabase
   const { data: { session } } = await supabase.auth.getSession();
   auth.setSession(session);
+  
+  // Now render the navbar and the initial page
   renderNavbar(navbarContainer);
+  router();
 
+  // Handle navigation
   document.body.addEventListener('click', e => {
     const target = e.target as HTMLElement;
     const link = target.closest('[data-link]') as HTMLAnchorElement;
@@ -58,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       router();
     }
   });
-  
-  router();
+
+  // Handle back/forward browser buttons
+  window.addEventListener('popstate', router);
 });
