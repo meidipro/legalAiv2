@@ -5,23 +5,40 @@ import { auth } from '../auth';
 // --- TYPE DEFINITIONS ---
 type Sender = 'user' | 'ai';
 interface Message { sender: Sender; text: string; }
-interface Conversation { id: string; title: string; messages: Message[]; created_at?: string; user_id?: string; dify_conversation_id?: string; }
+interface Conversation { id: string; title: string; messages: Message[]; created_at?: string; user_id?: string; }
 interface AppState { conversations: Conversation[]; activeConversationId: string | null; }
 
-// --- The Main Export Function ---
 export function renderAppPage(container: HTMLElement) {
-
   // --- CONFIGURATION ---
   const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY;
   const GUEST_STORAGE_KEY = 'legalAI.guestConversations';
-  
+  const GUEST_USER_ID_KEY = 'legalAI.guestUserId';
+
   // --- APP STATE & MODE ---
   let appState: AppState;
-  const isGuestMode = auth.getSession() === null;
+  const session = auth.getSession();
+  const isGuestMode = session === null;
 
+  // ===================================================================
+  // ===== THE CORE FIX: PERSISTENT GUEST ID ===========================
+  // ===================================================================
+  function getOrCreateGuestUserId(): string {
+    let guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+    if (!guestId) {
+        guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem(GUEST_USER_ID_KEY, guestId);
+    }
+    return guestId;
+  }
+  // Use the real user ID if logged in, otherwise use the persistent guest ID.
+  const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
+  
   // --- RENDER HTML SKELETON ---
   container.innerHTML = `
     <div class="app-layout">
+        <button id="hamburger-menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
         <aside class="sidebar">
             <div class="sidebar-header"><h1>LegalAI<span>.bd</span></h1></div>
             <button class="new-chat-btn">
@@ -55,9 +72,13 @@ export function renderAppPage(container: HTMLElement) {
                 </form>
             </div>
         </main>
+        <div id="overlay"></div>
     </div>`;
 
   // --- GET DOM ELEMENTS ---
+  const sidebar = document.querySelector('.sidebar') as HTMLElement;
+  const hamburgerMenu = document.getElementById('hamburger-menu') as HTMLButtonElement;
+  const overlay = document.getElementById('overlay') as HTMLDivElement;
   const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
   const messageForm = document.getElementById('message-form') as HTMLFormElement;
   const messageInput = document.getElementById('message-input') as HTMLInputElement;
@@ -105,16 +126,11 @@ export function renderAppPage(container: HTMLElement) {
       if (activeConvo) activeConvo.messages.forEach(msg => displayMessage(msg.text, msg.sender));
       chatWindow.scrollTop = chatWindow.scrollHeight;
   }
-  
-  // ===================================================================
-  // ===== THE CORRECTED FUNCTION WITH AI ICON =========================
-  // ===================================================================
   function displayMessage(text: string, sender: Sender) {
       const messageWrapper = document.createElement('div');
       messageWrapper.className = `message-wrapper ${sender}`;
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
-      
       if(sender === 'user') {
           avatar.classList.add('user-avatar');
           avatar.textContent = 'You';
@@ -159,7 +175,9 @@ export function renderAppPage(container: HTMLElement) {
       }
   }
   async function createNewConversation() {
-      const newConvo: Conversation = { id: Date.now().toString(), title: "New Conversation", messages: [{ sender: 'ai', text: "Hello! I'm ready for a new chat. How can I assist you?" }] };
+      // Dify uses the persistent `userIdentifier` to manage conversations on its side.
+      // We just need to create a new conversation in our local UI state.
+      const newConvo: Conversation = { id: Date.now().toString(), title: "New Conversation", messages: [{ sender: 'ai', text: "Hello! Please select a role and ask me a question." }] };
       if (isGuestMode) {
           appState.conversations.unshift(newConvo);
           localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
@@ -210,7 +228,7 @@ export function renderAppPage(container: HTMLElement) {
           setTimeout(() => { button.innerHTML = originalContent; button.disabled = false; }, 2000);
       }).catch(err => { console.error('Failed to copy chat:', err); alert('Failed to copy chat.'); });
   }
-  async function addMessageToActiveConversation(message: Message, difyConversationId?: string) {
+  async function addMessageToActiveConversation(message: Message) {
       const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
       if (!activeConvo) return;
       activeConvo.messages.push(message);
@@ -219,18 +237,10 @@ export function renderAppPage(container: HTMLElement) {
           newTitle = message.text.substring(0, 25) + (message.text.length > 25 ? '...' : '');
       }
       activeConvo.title = newTitle;
-      if (difyConversationId) {
-          activeConvo.dify_conversation_id = difyConversationId;
-      }
       if (isGuestMode) {
           localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
       } else {
-          const { error } = await supabase.from('conversations').update({ 
-              messages: activeConvo.messages, 
-              title: newTitle,
-              dify_conversation_id: activeConvo.dify_conversation_id 
-          }).eq('id', activeConvo.id);
-          if (error) console.error("Error saving message:", error);
+          await supabase.from('conversations').update({ messages: activeConvo.messages, title: newTitle }).eq('id', activeConvo.id);
       }
       renderSidebar();
       renderChatWindow();
@@ -244,8 +254,8 @@ export function renderAppPage(container: HTMLElement) {
     }
     if (!userInput) return;
     if (!appState.activeConversationId) await createNewConversation();
+    
     const selectedRole = roleSelector.value;
-    const userIdentifier = auth.getUserId() || `guest_${Date.now()}`;
     const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
     if (!activeConvo) return; 
 
@@ -257,7 +267,6 @@ export function renderAppPage(container: HTMLElement) {
     const tempLastBubble = tempBubbles[tempBubbles.length -1];
 
     try {
-        const difyConversationId = activeConvo.dify_conversation_id || undefined;
         const DIFY_CHAT_URL = 'https://api.dify.ai/v1/chat-messages';
 
         const response = await fetch(DIFY_CHAT_URL, {
@@ -266,9 +275,11 @@ export function renderAppPage(container: HTMLElement) {
             body: JSON.stringify({
                 inputs: { "USER_ROLE": selectedRole, "LANGUAGE": "English" },
                 query: userInput,
-                user: userIdentifier, 
-                conversation_id: difyConversationId,
-                response_mode: 'streaming' 
+                user: userIdentifier, // This PERSISTENT ID is the key
+                response_mode: 'streaming',
+                // We let Dify manage conversation continuity using the 'user' ID
+                // and a blank conversation_id tells it to use the latest for that user, or start a new one.
+                conversation_id: "" 
             })
         });
 
@@ -284,7 +295,6 @@ export function renderAppPage(container: HTMLElement) {
         const decoder = new TextDecoder();
         let done = false;
         let fullResponse = "";
-        let finalDifyConversationId = difyConversationId;
 
         displayMessage("", 'ai');
         const aiBubbles = chatWindow.querySelectorAll('.message-wrapper.ai .message-bubble');
@@ -300,7 +310,6 @@ export function renderAppPage(container: HTMLElement) {
                     const jsonStr = line.substring(6);
                     if (jsonStr.trim() === '[DONE]') continue;
                     const parsed = JSON.parse(jsonStr);
-                    if (parsed.conversation_id) { finalDifyConversationId = parsed.conversation_id; }
                     if (parsed.event === 'agent_message' || parsed.event === 'message') {
                         fullResponse += parsed.answer;
                         aiLastBubble.innerText = fullResponse;
@@ -310,7 +319,7 @@ export function renderAppPage(container: HTMLElement) {
             }
         }
 
-        await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
+        await addMessageToActiveConversation({ sender: 'ai', text: fullResponse });
 
     } catch (error) {
         console.error("Dify API Error:", error);
@@ -327,6 +336,22 @@ export function renderAppPage(container: HTMLElement) {
           themeText.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
       });
       newChatBtn.addEventListener('click', createNewConversation);
+      
+      function toggleSidebar() { sidebar.classList.toggle('is-open'); }
+      hamburgerMenu.addEventListener('click', toggleSidebar);
+      overlay.addEventListener('click', toggleSidebar);
+      conversationList.addEventListener('click', (e) => {
+        if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) {
+            toggleSidebar();
+        }
+      });
+      
+      if (isGuestMode) {
+          const guestNotice = document.createElement('div');
+          guestNotice.style.cssText = 'background-color: var(--bg-soft); color: var(--text-secondary); padding: 8px; text-align: center; font-size: 14px;';
+          guestNotice.innerHTML = `You are in Guest Mode. <a href="/login" data-link>Sign In</a> to save history.`;
+          document.querySelector('.sidebar')?.prepend(guestNotice);
+      }
       
       await loadState();
       renderSidebar();
