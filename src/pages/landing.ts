@@ -1,12 +1,10 @@
 // src/pages/landing.ts
 
 // This tells TypeScript that the `particlesJS` function exists globally
-// (from the script we added in index.html)
 declare const particlesJS: any;
 
 const landingHTML = `
   <div class="landing-page-wrapper">
-    <!-- The sections are now siblings, not grid children, so they will stack vertically -->
     <section class="hero-section">
       <div id="particles-js"></div> 
       <div class="hero-content">
