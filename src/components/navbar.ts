@@ -7,6 +7,8 @@ async function handleSignOut() {
     // The onAuthStateChange listener in main.ts will handle the redirect.
 }
 
+// ... (handleSignOut function remains the same)
+
 export function renderNavbar(container: HTMLElement) {
     const session = auth.getSession();
     let navHTML = '';
@@ -16,6 +18,12 @@ export function renderNavbar(container: HTMLElement) {
         navHTML = `
           <nav class="navbar">
             <div class="navbar-left">
+              
+              <!-- HAMBURGER MENU ADDED HERE -->
+              <button id="hamburger-menu" aria-label="Open sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+              </button>
+              
               <a href="/app" class="navbar-brand" data-link>LegalAI<span>.bd</span></a>
             </div>
             <div class="navbar-right">
@@ -34,7 +42,7 @@ export function renderNavbar(container: HTMLElement) {
           </nav>
         `;
     } else {
-        // Logged-out guest view
+        // Logged-out guest view (remains unchanged)
         navHTML = `
           <nav class="navbar">
             <div class="navbar-left">

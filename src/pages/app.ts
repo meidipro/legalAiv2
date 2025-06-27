@@ -29,9 +29,7 @@ export function renderAppPage(container: HTMLElement) {
   
     container.innerHTML = `
       <div class="app-layout">
-          <button id="hamburger-menu">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
+          <!-- THE STRAY HAMBURGER MENU BUTTON HAS BEEN DELETED FROM HERE -->
           <aside class="sidebar">
               <div class="sidebar-top">
                 <button class="new-chat-btn">
@@ -71,7 +69,8 @@ export function renderAppPage(container: HTMLElement) {
       </div>`;
 
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const hamburgerMenu = document.getElementById('hamburger-menu') as HTMLButtonElement;
+    // We get the hamburger menu from the navbar, NOT from the app page content
+    const hamburgerMenu = document.querySelector('#navbar-container #hamburger-menu') as HTMLButtonElement; 
     const overlay = document.getElementById('overlay') as HTMLDivElement;
     const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
     const messageForm = document.getElementById('message-form') as HTMLFormElement;

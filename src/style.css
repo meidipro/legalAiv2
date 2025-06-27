@@ -225,26 +225,65 @@ body {
 #send-button svg { stroke: white; }
 
 /* Mobile Responsiveness & Hamburger Menu */
-#hamburger-menu, #overlay { display: none; }
+
+/* This is the new base style for the hamburger menu. It's hidden by default on desktop. */
+#hamburger-menu {
+    display: none; /* Hidden on desktop */
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    margin-right: 12px; /* Adds space between icon and brand name */
+}
+#hamburger-menu svg {
+    stroke: var(--text-primary);
+    width: 24px;
+    height: 24px;
+}
+
+#overlay { 
+    display: none; 
+}
+
 @media (max-width: 900px) {
-    .navbar-left .nav-links, .navbar-right { display: none; }
-    .navbar-left { flex-grow: 1; }
-    #hamburger-menu {
-        display: flex; align-items: center; justify-content: center;
-        position: fixed; top: 20px; left: 16px; z-index: 210;
-        background: var(--bg-soft); border: 1px solid var(--border-color);
-        border-radius: 8px; width: 40px; height: 40px; cursor: pointer;
+    /* Hide desktop nav elements on mobile */
+    .navbar-left .nav-links, .navbar-right { 
+        display: none; 
     }
+    
+    .navbar {
+        padding: 0 16px; /* Adjust padding for mobile */
+    }
+
+    .navbar-left { 
+        flex-grow: 1; 
+    }
+    
+    /* Show the hamburger menu on mobile */
+    #hamburger-menu {
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+    }
+    
+    /* --- Sidebar Styles (Unchanged but included for context) --- */
     .sidebar {
         position: fixed; top: 0; left: 0; bottom: 0; height: 100vh;
         transform: translateX(-100%); z-index: 200;
         box-shadow: 4px 0px 15px rgba(0,0,0,0.1); border-right: none;
+        transition: transform 0.3s ease-in-out;
     }
-    .sidebar.is-open { transform: translateX(0); }
+    .sidebar.is-open { 
+        transform: translateX(0); 
+    }
+    
+    /* --- Overlay Styles (Unchanged but included for context) --- */
     #overlay {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background-color: rgba(0, 0, 0, 0.5); z-index: 199;
         opacity: 0; pointer-events: none; transition: opacity 0.3s ease-in-out;
     }
-    .sidebar.is-open ~ #overlay { display: block; opacity: 1; pointer-events: all; }
+    .sidebar.is-open ~ #overlay { 
+        display: block; opacity: 1; pointer-events: all; 
+    }
 }
