@@ -51,6 +51,8 @@ body {
 .navbar {
     height: 72px; padding: 0 5%; display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid var(--border-color); background-color: var(--bg-main);
+    position: relative; /* Establishes a stacking context */
+    z-index: 100;       /* Ensures it's above other page content */
 }
 .navbar-left, .navbar-right { display: flex; align-items: center; gap: 32px; }
 .navbar-brand { font-weight: 700; font-size: 22px; text-decoration: none; color: var(--text-primary); }
@@ -263,6 +265,38 @@ body {
 /* Make sure your inputs have full width */
 .login-form input {
     width: 100%;
+}
+
+/* Add this to style.css */
+
+#message-input {
+    /* Adjust padding to make space for the new mic button */
+    padding: 14px 52px 14px 52px; 
+}
+
+.mic-btn {
+    position: absolute;
+    left: 8px; /* Position on the left side */
+    width: 36px;
+    height: 36px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.mic-btn:hover {
+    background-color: var(--bg-soft);
+}
+
+.mic-btn.is-listening {
+    color: var(--accent-color-start);
+    transform: scale(1.1);
 }
 
 /* Mobile Responsiveness & Hamburger Menu */

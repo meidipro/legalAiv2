@@ -8,6 +8,23 @@ interface Message { sender: Sender; text: string; }
 interface Conversation { id: string; title: string; messages: Message[]; dify_conversation_id?: string; }
 interface AppState { conversations: Conversation[]; activeConversationId: string | null; }
 
+// --- Add type definitions for Web Speech API to avoid TypeScript errors ---
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+declare var webkitSpeechRecognition: any;
+declare var SpeechRecognition: any;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: typeof SpeechRecognition;
+    webkitSpeechRecognition?: typeof webkitSpeechRecognition;
+  }
+}
+
 export function renderAppPage(container: HTMLElement) {
     const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY;
     const GUEST_STORAGE_KEY = 'legalAI.guestConversations';
@@ -16,6 +33,12 @@ export function renderAppPage(container: HTMLElement) {
     let appState: AppState;
     const session = auth.getSession();
     const isGuestMode = session === null;
+
+    // --- NEW: Voice Synthesis & Recognition Setup ---
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = SpeechRecognitionAPI ? new SpeechRecognitionAPI() : null;
+    const synthesis = window.speechSynthesis;
+    let isListening = false;
 
     function getOrCreateGuestUserId(): string {
         let guestId = localStorage.getItem(GUEST_USER_ID_KEY);
@@ -27,6 +50,7 @@ export function renderAppPage(container: HTMLElement) {
     }
     const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
   
+    // --- UPDATED HTML with Microphone Button ---
     container.innerHTML = `
       <div class="app-layout">
           <aside class="sidebar">
@@ -57,6 +81,9 @@ export function renderAppPage(container: HTMLElement) {
               <div id="chat-window"></div>
               <div class="message-form-container">
                   <form id="message-form">
+                      <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                      </button>
                       <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
                       <button type="submit" id="send-button">
                           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -78,10 +105,28 @@ export function renderAppPage(container: HTMLElement) {
     const darkModeToggle = document.getElementById('dark-mode-toggle') as HTMLDivElement;
     const themeText = document.getElementById('theme-text') as HTMLSpanElement;
     const userProfileLink = document.getElementById('user-profile-link') as HTMLDivElement;
+    const micButton = document.getElementById('mic-button') as HTMLButtonElement; // New element
+
+    // --- NEW: Text-to-Speech Function ---
+    function speakText(text: string) {
+        if (synthesis.speaking) {
+            synthesis.cancel();
+        }
+        const utterance = new SpeechSynthesisUtterance(text);
+        const voices = synthesis.getVoices();
+        const langCode = i18n.getLanguage();
+        const preferredVoice = voices.find(voice => voice.lang.startsWith(langCode) && voice.name.includes('Google'));
+        utterance.voice = preferredVoice || voices.find(voice => voice.lang.startsWith(langCode)) || voices[0];
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        synthesis.speak(utterance);
+    }
+    
+    // --- All original functions are here, with one modification to handleFormSubmit ---
 
     function renderSidebar() {
         if (!conversationList) return;
-        conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`; // Re-render title on sidebar updates
+        conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`;
         (appState.conversations || []).forEach(convo => {
             const convoItem = document.createElement('div');
             convoItem.className = 'conversation-item';
@@ -95,11 +140,7 @@ export function renderAppPage(container: HTMLElement) {
             actionsMenu.className = 'conversation-actions';
             actionsMenu.innerHTML = `<button class="action-btn rename-btn" title="Rename"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button><button class="action-btn share-btn" title="Share"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg></button><button class="action-btn delete-btn" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
             if (isGuestMode) {
-                actionsMenu.querySelectorAll('button').forEach(btn => {
-                    (btn as HTMLButtonElement).disabled = true;
-                    btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed';
-                    btn.setAttribute('title', 'Sign in to use this feature');
-                });
+                actionsMenu.querySelectorAll('button').forEach(btn => { (btn as HTMLButtonElement).disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; btn.setAttribute('title', 'Sign in to use this feature'); });
             } else {
                 actionsMenu.querySelector('.rename-btn')?.addEventListener('click', (e) => { e.stopPropagation(); renameConversation(convo.id); });
                 actionsMenu.querySelector('.share-btn')?.addEventListener('click', (e) => { e.stopPropagation(); shareConversation(convo.id, e.currentTarget as HTMLButtonElement); });
@@ -113,16 +154,8 @@ export function renderAppPage(container: HTMLElement) {
     function renderChatWindow() {
         if (!chatWindow) return;
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
-        
         if (activeConvo && activeConvo.messages.length <= 1) {
-            chatWindow.innerHTML = `
-              <div class="empty-chat-container">
-                  <div class="empty-chat-logo">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg>
-                  </div>
-                  <h2>${i18n.t('app_emptyChatTitle')}</h2>
-              </div>
-            `;
+            chatWindow.innerHTML = `<div class="empty-chat-container"> <div class="empty-chat-logo"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg> </div> <h2>${i18n.t('app_emptyChatTitle')}</h2> </div>`;
         } else {
             chatWindow.innerHTML = '';
             if (activeConvo) activeConvo.messages.forEach(msg => displayMessage(msg.text, msg.sender));
@@ -138,8 +171,7 @@ export function renderAppPage(container: HTMLElement) {
         if (sender === 'user') {
             avatar.classList.add('user-avatar');
             const user = auth.getSession()?.user;
-            const initial = user?.email?.charAt(0).toUpperCase() || 'G';
-            avatar.textContent = initial;
+            avatar.textContent = user?.email?.charAt(0).toUpperCase() || 'G';
         } else {
             avatar.classList.add('ai-avatar');
             avatar.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg>`;
@@ -156,8 +188,7 @@ export function renderAppPage(container: HTMLElement) {
         messageBubble.className = 'message-bubble';
         messageBubble.innerText = text;
         messageContent.appendChild(messageBubble);
-        if (sender === 'user') { messageWrapper.appendChild(messageContent); messageWrapper.appendChild(avatar); }
-        else { messageWrapper.appendChild(avatar); messageWrapper.appendChild(messageContent); }
+        if (sender === 'user') { messageWrapper.appendChild(messageContent); messageWrapper.appendChild(avatar); } else { messageWrapper.appendChild(avatar); messageWrapper.appendChild(messageContent); }
         chatWindow.appendChild(messageWrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
@@ -253,11 +284,9 @@ export function renderAppPage(container: HTMLElement) {
     async function addMessageToActiveConversation(message: Message, difyConversationId?: string) {
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
         if (!activeConvo) return;
-        
         if (activeConvo.messages[activeConvo.messages.length - 1]?.text !== i18n.t('app_thinking')) {
             activeConvo.messages.push(message);
         }
-
         let newTitle = activeConvo.title;
         if (activeConvo.title === i18n.t('app_newChat') && message.sender === 'user') {
             newTitle = message.text.substring(0, 25) + (message.text.length > 25 ? '...' : '');
@@ -281,9 +310,10 @@ export function renderAppPage(container: HTMLElement) {
         if (!userInput) return;
         if (!appState.activeConversationId) await createNewConversation();
         
+        if (synthesis.speaking) { synthesis.cancel(); }
+
         const roleSelectorElement = document.getElementById('role-selector') as HTMLSelectElement | null;
         const selectedRole = roleSelectorElement ? roleSelectorElement.value : "General Public";
-
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
         if (!activeConvo) return; 
 
@@ -300,20 +330,14 @@ export function renderAppPage(container: HTMLElement) {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    inputs: { 
-                        "USER_ROLE": selectedRole, 
-                        "LANGUAGE": i18n.getAiLanguage()
-                    },
-                    query: userInput,
-                    user: userIdentifier,
-                    conversation_id: activeConvo.dify_conversation_id || "",
-                    response_mode: 'streaming' 
+                    inputs: { "USER_ROLE": selectedRole, "LANGUAGE": i18n.getAiLanguage() },
+                    query: userInput, user: userIdentifier, conversation_id: activeConvo.dify_conversation_id || "", response_mode: 'streaming' 
                 })
             });
             if (!response.ok) { const errorBody = await response.text(); throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`); }
             if (!response.body) { throw new Error("API response was successful but had no body."); }
             
-            tempLastBubble.remove();
+            if(tempLastBubble) tempLastBubble.remove();
             
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -341,10 +365,20 @@ export function renderAppPage(container: HTMLElement) {
                     } catch (e) { /* Ignore parsing errors */ }
                 }
             }
-            await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
+            // Update the final message in the state
+            const finalMessageIndex = activeConvo.messages.length - 1;
+            if (activeConvo.messages[finalMessageIndex]?.sender === 'ai') {
+                activeConvo.messages[finalMessageIndex].text = fullResponse;
+            } else {
+                 await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
+            }
+            speakText(fullResponse);
+
         } catch (error) {
-            tempLastBubble?.remove();
-            await addMessageToActiveConversation({ sender: 'ai', text: `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}` });
+            if(tempLastBubble) tempLastBubble.remove();
+            const errorMessage = `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}`;
+            await addMessageToActiveConversation({ sender: 'ai', text: errorMessage });
+            speakText(errorMessage);
         }
     }
 
@@ -353,33 +387,51 @@ export function renderAppPage(container: HTMLElement) {
         const user = session?.user;
         if (user) {
             const userInitial = user.email?.charAt(0).toUpperCase() || 'P';
-            userProfileLink.innerHTML = `
-                <a href="/profile" data-link>
-                    <div class="avatar user-avatar">${userInitial}</div>
-                    <span>${user.email}</span>
-                </a>
-            `;
+            userProfileLink.innerHTML = `<a href="/profile" data-link><div class="avatar user-avatar">${userInitial}</div><span>${user.email}</span></a>`;
         } else {
-            userProfileLink.innerHTML = `
-                <a href="/login" class="nav-button nav-button-primary" data-link>${i18n.t('app_signUpToSave')}</a>
-            `;
+            userProfileLink.innerHTML = `<a href="/login" class="nav-button nav-button-primary" data-link>${i18n.t('app_signUpToSave')}</a>`;
         }
     }
+    renderUserProfileLink();
 
     async function initApp() {
-        function toggleSidebar() { 
-            sidebar.classList.toggle('is-open'); 
-            overlay.classList.toggle('is-open');
+        // --- NEW: Speech-to-Text Logic ---
+        function setupSpeechRecognition() {
+            if (!recognition) {
+                if (micButton) micButton.style.display = 'none';
+                console.warn("Speech Recognition not supported in this browser.");
+                return;
+            }
+
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = i18n.getLanguage() === 'bn' ? 'bn-BD' : 'en-US';
+
+            recognition.onstart = () => { isListening = true; micButton.classList.add('is-listening'); };
+            recognition.onend = () => { isListening = false; micButton.classList.remove('is-listening'); };
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => { console.error("Speech recognition error", event.error); };
+
+            recognition.onresult = (event: SpeechRecognitionEvent) => {
+                const transcript = event.results[0][0].transcript;
+                messageInput.value = transcript;
+                handleFormSubmit();
+            };
+
+            micButton.addEventListener('click', () => {
+                if (synthesis.speaking) { synthesis.cancel(); }
+                if (isListening) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
         }
+        
+        // --- Original initApp logic ---
+        function toggleSidebar() { sidebar.classList.toggle('is-open'); overlay.classList.toggle('is-open'); }
         if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
-        
-        conversationList.addEventListener('click', (e) => {
-            if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) {
-                toggleSidebar();
-            }
-        });
-
+        conversationList.addEventListener('click', (e) => { if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) { toggleSidebar(); } });
         messageForm.addEventListener('submit', (e) => { e.preventDefault(); handleFormSubmit(); });
         newChatBtn.addEventListener('click', createNewConversation);
         darkModeToggle.addEventListener('click', () => {
@@ -395,9 +447,8 @@ export function renderAppPage(container: HTMLElement) {
         }
         
         await loadState();
-        renderSidebar();
-        renderChatWindow();
-        renderUserProfileLink();
+        
+        setupSpeechRecognition(); // Activate the microphone button
     }
 
     initApp();
