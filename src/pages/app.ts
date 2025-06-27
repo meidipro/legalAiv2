@@ -59,14 +59,6 @@ export function renderAppPage(container: HTMLElement) {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     ${i18n.t('app_newChat')}
                 </button>
-                <div class="sidebar-role-selector">
-                    <label for="role-selector">${i18n.t('app_iAmA')}</label>
-                    <select id="role-selector">
-                        <option value="General Public">${i18n.t('app_role_general')}</option>
-                        <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
-                        <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
-                    </select>
-                </div>
               </div>
               <div class="conversation-list"><h2>${i18n.t('app_history')}</h2></div>
               <div class="sidebar-footer">
@@ -79,6 +71,16 @@ export function renderAppPage(container: HTMLElement) {
           </aside>
           <main class="main-content">
               <div id="chat-window"></div>
+              <div class="prompt-enhancers">
+                  <div class="context-role-selector">
+                      <label for="role-selector">${i18n.t('app_iAmA')}</label>
+                      <select id="role-selector">
+                          <option value="General Public">${i18n.t('app_role_general')}</option>
+                          <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
+                          <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
+                      </select>
+                  </div>
+              </div>
               <div class="message-form-container">
                   <form id="message-form">
                       <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
@@ -117,6 +119,18 @@ export function renderAppPage(container: HTMLElement) {
         const langCode = i18n.getLanguage();
         const preferredVoice = voices.find(voice => voice.lang.startsWith(langCode) && voice.name.includes('Google'));
         utterance.voice = preferredVoice || voices.find(voice => voice.lang.startsWith(langCode)) || voices[0];
+        
+        const lastMessageAvatar = chatWindow.querySelector('.message-wrapper:last-child .ai-avatar');
+        utterance.onstart = () => {
+            lastMessageAvatar?.classList.add('is-speaking');
+        };
+        utterance.onend = () => {
+            lastMessageAvatar?.classList.remove('is-speaking');
+        };
+        utterance.onerror = () => { // Ensure class is removed on error too
+            lastMessageAvatar?.classList.remove('is-speaking');
+        };
+
         utterance.rate = 1;
         utterance.pitch = 1;
         synthesis.speak(utterance);
@@ -215,10 +229,9 @@ export function renderAppPage(container: HTMLElement) {
         if (appState.conversations.length === 0) {
           await createNewConversation();
         } else if (!appState.activeConversationId) {
-          setActiveConversation(appState.conversations[0].id);
-        } else {
-          renderSidebar();
-          renderChatWindow();
+          // This used to call setActiveConversation, now it just sets the ID.
+          // The rendering is handled in initApp after all data is loaded.
+          appState.activeConversationId = appState.conversations[0].id;
         }
     }
     
@@ -262,9 +275,14 @@ export function renderAppPage(container: HTMLElement) {
         if (index > -1) {
             appState.conversations.splice(index, 1);
             if (appState.activeConversationId === id) {
-                if (appState.conversations.length > 0) setActiveConversation(appState.conversations[0].id);
-                else await createNewConversation();
-            } else renderSidebar();
+                if (appState.conversations.length > 0) {
+                    setActiveConversation(appState.conversations[0].id);
+                } else {
+                    await createNewConversation();
+                }
+            } else {
+                renderSidebar();
+            }
         }
     }
     
@@ -395,7 +413,6 @@ export function renderAppPage(container: HTMLElement) {
     renderUserProfileLink();
 
     async function initApp() {
-        // --- NEW: Speech-to-Text Logic ---
         function setupSpeechRecognition() {
             if (!recognition) {
                 if (micButton) micButton.style.display = 'none';
@@ -407,9 +424,14 @@ export function renderAppPage(container: HTMLElement) {
             recognition.interimResults = false;
             recognition.lang = i18n.getLanguage() === 'bn' ? 'bn-BD' : 'en-US';
 
+            // This is the updated part for the pulsing effect
             recognition.onstart = () => { isListening = true; micButton.classList.add('is-listening'); };
             recognition.onend = () => { isListening = false; micButton.classList.remove('is-listening'); };
-            recognition.onerror = (event: SpeechRecognitionErrorEvent) => { console.error("Speech recognition error", event.error); };
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => { 
+                console.error("Speech recognition error", event.error);
+                isListening = false; // Make sure listening stops on error
+                micButton.classList.remove('is-listening');
+            };
 
             recognition.onresult = (event: SpeechRecognitionEvent) => {
                 const transcript = event.results[0][0].transcript;
@@ -427,7 +449,6 @@ export function renderAppPage(container: HTMLElement) {
             });
         }
         
-        // --- Original initApp logic ---
         function toggleSidebar() { sidebar.classList.toggle('is-open'); overlay.classList.toggle('is-open'); }
         if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);

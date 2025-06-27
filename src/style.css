@@ -299,6 +299,77 @@ body {
     transform: scale(1.1);
 }
 
+/* --- NEW: Voice Recording/Speaking Effects --- */
+
+/* Pulsing effect for the mic button when listening */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+}
+
+.dark-mode .mic-btn.is-listening {
+  /* Use a lighter pulse for dark mode */
+  animation: pulseDark 2s infinite;
+}
+
+@keyframes pulseDark {
+  0% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(167, 139, 250, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0); }
+}
+
+.mic-btn.is-listening {
+  animation: pulse 2s infinite;
+  border-radius: 50%; /* Make it a circle for the pulse effect */
+}
+
+/* Glowing effect for the AI avatar when speaking */
+.avatar.ai-avatar.is-speaking {
+  box-shadow: 0 0 10px 4px var(--accent-color-start);
+  border-color: var(--accent-color-start);
+  transition: box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+}
+
+
+/* --- NEW: Relocated Role Selector --- */
+
+/* Container for the new role selector above the form */
+.prompt-enhancers {
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 5%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.context-role-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.context-role-selector label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.context-role-selector select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+.context-role-selector select:focus {
+    outline: 2px solid var(--accent-color-start);
+}
+
 /* Mobile Responsiveness & Hamburger Menu */
 
 /* This is the new base style for the hamburger menu. It's hidden by default on desktop. */
