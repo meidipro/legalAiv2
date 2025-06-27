@@ -224,6 +224,8 @@ body {
 #send-button:hover { transform: scale(1.1); }
 #send-button svg { stroke: white; }
 
+
+
 /* Mobile Responsiveness & Hamburger Menu */
 
 /* This is the new base style for the hamburger menu. It's hidden by default on desktop. */

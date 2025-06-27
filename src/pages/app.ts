@@ -1,8 +1,8 @@
 // src/pages/app.ts
 import { supabase } from '../supabaseClient';
 import { auth } from '../auth';
+import { i18n } from '../i18n';
 
-// --- TYPE DEFINITIONS ---
 type Sender = 'user' | 'ai';
 interface Message { sender: Sender; text: string; }
 interface Conversation { id: string; title: string; messages: Message[]; dify_conversation_id?: string; }
@@ -18,38 +18,37 @@ export function renderAppPage(container: HTMLElement) {
     const isGuestMode = session === null;
 
     function getOrCreateGuestUserId(): string {
-      let guestId = localStorage.getItem(GUEST_USER_ID_KEY);
-      if (!guestId) {
-          guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-          localStorage.setItem(GUEST_USER_ID_KEY, guestId);
-      }
-      return guestId;
+        let guestId = localStorage.getItem(GUEST_USER_ID_KEY);
+        if (!guestId) {
+            guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+            localStorage.setItem(GUEST_USER_ID_KEY, guestId);
+        }
+        return guestId;
     }
     const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
   
     container.innerHTML = `
       <div class="app-layout">
-          <!-- THE STRAY HAMBURGER MENU BUTTON HAS BEEN DELETED FROM HERE -->
           <aside class="sidebar">
               <div class="sidebar-top">
                 <button class="new-chat-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    New Chat
+                    ${i18n.t('app_newChat')}
                 </button>
                 <div class="sidebar-role-selector">
-                    <label for="role-selector">I am a:</label>
+                    <label for="role-selector">${i18n.t('app_iAmA')}</label>
                     <select id="role-selector">
-                        <option value="General Public">General Public</option>
-                        <option value="Law Student" selected>Law Student</option>
-                        <option value="Legal Professional">Legal Professional</option>
+                        <option value="General Public">${i18n.t('app_role_general')}</option>
+                        <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
+                        <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
                     </select>
                 </div>
               </div>
-              <div class="conversation-list"><h2>History</h2></div>
+              <div class="conversation-list"><h2>${i18n.t('app_history')}</h2></div>
               <div class="sidebar-footer">
                   <div id="dark-mode-toggle">
                        <svg class="icon" id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
-                       <span id="theme-text">Dark Mode</span>
+                       <span id="theme-text">${document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode')}</span>
                   </div>
                   <div id="user-profile-link" class="user-profile-link"></div>
               </div>
@@ -58,7 +57,7 @@ export function renderAppPage(container: HTMLElement) {
               <div id="chat-window"></div>
               <div class="message-form-container">
                   <form id="message-form">
-                      <input type="text" id="message-input" placeholder="Ask anything..." autocomplete="off" required>
+                      <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
                       <button type="submit" id="send-button">
                           <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                       </button>
@@ -69,7 +68,6 @@ export function renderAppPage(container: HTMLElement) {
       </div>`;
 
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    // We get the hamburger menu from the navbar, NOT from the app page content
     const hamburgerMenu = document.querySelector('#navbar-container #hamburger-menu') as HTMLButtonElement; 
     const overlay = document.getElementById('overlay') as HTMLDivElement;
     const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
@@ -83,8 +81,7 @@ export function renderAppPage(container: HTMLElement) {
 
     function renderSidebar() {
         if (!conversationList) return;
-        const existingItems = conversationList.querySelectorAll('.conversation-item');
-        existingItems.forEach(item => item.remove());
+        conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`; // Re-render title on sidebar updates
         (appState.conversations || []).forEach(convo => {
             const convoItem = document.createElement('div');
             convoItem.className = 'conversation-item';
@@ -123,7 +120,7 @@ export function renderAppPage(container: HTMLElement) {
                   <div class="empty-chat-logo">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg>
                   </div>
-                  <h2>What can I help with?</h2>
+                  <h2>${i18n.t('app_emptyChatTitle')}</h2>
               </div>
             `;
         } else {
@@ -152,7 +149,7 @@ export function renderAppPage(container: HTMLElement) {
         if (sender !== 'user') {
             const senderName = document.createElement('div');
             senderName.className = 'sender-name';
-            senderName.textContent = 'LegalAI';
+            senderName.textContent = i18n.t('app_aiSenderName');
             messageContent.appendChild(senderName);
         }
         const messageBubble = document.createElement('div');
@@ -189,14 +186,17 @@ export function renderAppPage(container: HTMLElement) {
         } else if (!appState.activeConversationId) {
           setActiveConversation(appState.conversations[0].id);
         } else {
-          // If state is loaded, ensure the view is correct
           renderSidebar();
           renderChatWindow();
         }
     }
     
     async function createNewConversation() {
-        const newConvo: Conversation = { id: Date.now().toString(), title: "New Conversation", messages: [{ sender: 'ai', text: "Hello! What can I help you with today?" }] };
+        const newConvo: Conversation = { 
+            id: Date.now().toString(), 
+            title: i18n.t('app_newChat'), 
+            messages: [{ sender: 'ai', text: i18n.t('app_initialGreeting') }] 
+        };
         if (isGuestMode) {
             appState.conversations.unshift(newConvo);
             localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
@@ -214,7 +214,7 @@ export function renderAppPage(container: HTMLElement) {
         if (isGuestMode) return;
         const convo = appState.conversations.find(c => c.id === id);
         if (!convo) return;
-        const newTitle = prompt("Enter new title:", convo.title);
+        const newTitle = prompt(i18n.t('app_renameTitlePrompt'), convo.title);
         if (newTitle && newTitle.trim() !== "") {
             const { error } = await supabase.from('conversations').update({ title: newTitle.trim() }).eq('id', id);
             if (error) { console.error("Error renaming:", error); }
@@ -224,7 +224,7 @@ export function renderAppPage(container: HTMLElement) {
     
     async function deleteConversation(id: string) {
         if (isGuestMode) return;
-        if (!confirm("Are you sure? This action cannot be undone.")) return;
+        if (!confirm(i18n.t('app_deleteConfirm'))) return;
         const { error } = await supabase.from('conversations').delete().eq('id', id);
         if (error) { console.error("Error deleting:", error); return; }
         const index = appState.conversations.findIndex(c => c.id === id);
@@ -254,13 +254,12 @@ export function renderAppPage(container: HTMLElement) {
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
         if (!activeConvo) return;
         
-        // This check prevents adding the same "thinking" message multiple times
-        if (activeConvo.messages[activeConvo.messages.length - 1]?.text !== '...') {
+        if (activeConvo.messages[activeConvo.messages.length - 1]?.text !== i18n.t('app_thinking')) {
             activeConvo.messages.push(message);
         }
 
         let newTitle = activeConvo.title;
-        if (activeConvo.title === "New Conversation" && message.sender === 'user') {
+        if (activeConvo.title === i18n.t('app_newChat') && message.sender === 'user') {
             newTitle = message.text.substring(0, 25) + (message.text.length > 25 ? '...' : '');
         }
         activeConvo.title = newTitle;
@@ -291,7 +290,7 @@ export function renderAppPage(container: HTMLElement) {
         messageInput.value = '';
         await addMessageToActiveConversation({ sender: 'user', text: userInput });
         
-        displayMessage('...', 'ai');
+        displayMessage(i18n.t('app_thinking'), 'ai');
         const tempBubbles = chatWindow.querySelectorAll('.message-wrapper');
         const tempLastBubble = tempBubbles[tempBubbles.length -1];
 
@@ -301,7 +300,10 @@ export function renderAppPage(container: HTMLElement) {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    inputs: { "USER_ROLE": selectedRole, "LANGUAGE": "English" },
+                    inputs: { 
+                        "USER_ROLE": selectedRole, 
+                        "LANGUAGE": i18n.getAiLanguage()
+                    },
                     query: userInput,
                     user: userIdentifier,
                     conversation_id: activeConvo.dify_conversation_id || "",
@@ -342,7 +344,7 @@ export function renderAppPage(container: HTMLElement) {
             await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
         } catch (error) {
             tempLastBubble?.remove();
-            await addMessageToActiveConversation({ sender: 'ai', text: `Sorry, an error occurred: ${error instanceof Error ? error.message : 'Unknown error'}` });
+            await addMessageToActiveConversation({ sender: 'ai', text: `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}` });
         }
     }
 
@@ -359,7 +361,7 @@ export function renderAppPage(container: HTMLElement) {
             `;
         } else {
             userProfileLink.innerHTML = `
-                <a href="/login" class="nav-button nav-button-primary" data-link>Sign Up to Save</a>
+                <a href="/login" class="nav-button nav-button-primary" data-link>${i18n.t('app_signUpToSave')}</a>
             `;
         }
     }
@@ -369,7 +371,7 @@ export function renderAppPage(container: HTMLElement) {
             sidebar.classList.toggle('is-open'); 
             overlay.classList.toggle('is-open');
         }
-        hamburgerMenu.addEventListener('click', toggleSidebar);
+        if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
         
         conversationList.addEventListener('click', (e) => {
@@ -382,13 +384,13 @@ export function renderAppPage(container: HTMLElement) {
         newChatBtn.addEventListener('click', createNewConversation);
         darkModeToggle.addEventListener('click', () => {
           document.body.classList.toggle('dark-mode');
-          if (themeText) themeText.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
+          if (themeText) themeText.textContent = document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode');
         });
 
         if (isGuestMode) {
             const guestNotice = document.createElement('div');
             guestNotice.style.cssText = 'background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 8px; text-align: center; font-size: 14px; border-radius: 8px; margin-bottom: 16px;';
-            guestNotice.innerHTML = `You are in Guest Mode. <a href="/login" data-link style="color: var(--accent-color-start); font-weight: 500;">Sign In</a> to save history.`;
+            guestNotice.innerHTML = `${i18n.t('app_guestNotice')} <a href="/login" data-link style="color: var(--accent-color-start); font-weight: 500;">${i18n.t('app_guestSignIn')}</a> ${i18n.t('app_guestToSave')}`;
             sidebar.prepend(guestNotice);
         }
         
