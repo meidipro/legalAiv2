@@ -65,4 +65,22 @@ export const translations = {
     profile_alert_notLoggedInUpdate: { en: 'You must be logged in to update your profile.', bn: 'প্রোফাইল আপডেট করার জন্য আপনাকে অবশ্যই লগইন করতে হবে।' },
     profile_alert_error: { en: 'Error updating profile:', bn: 'প্রোফাইল আপডেট করতে ত্রুটি হয়েছে:' },
     profile_alert_success: { en: 'Profile updated successfully!', bn: 'প্রোফাইল সফলভাবে আপডেট করা হয়েছে!' },
+
+    // Add this inside the main `translations` object in src/locales/translations.ts
+
+    // --- Login / Sign Up Page ---
+    login_page_signInTitle: { en: 'Sign In to LegalAI', bn: 'LegalAI-তে সাইন ইন করুন' },
+    login_page_signUpTitle: { en: 'Create Your Account', bn: 'আপনার অ্যাকাউন্ট তৈরি করুন' },
+    login_page_subtitle: { en: 'Access your saved chats and full history.', bn: 'আপনার সংরক্ষিত চ্যাট এবং সম্পূর্ণ ইতিহাস দেখুন।' },
+    login_page_googleButton: { en: 'Continue with Google', bn: 'Google দিয়ে চালিয়ে যান' },
+    login_page_divider: { en: 'or sign in with email', bn: 'অথবা ইমেইল দিয়ে সাইন ইন করুন' },
+    login_page_emailLabel: { en: 'Email', bn: 'ইমেইল' },
+    login_page_passwordLabel: { en: 'Password', bn: 'পাসওয়ার্ড' },
+    login_page_signInButton: { en: 'Sign In', bn: 'সাইন ইন' },
+    login_page_signUpButton: { en: 'Sign Up', bn: 'সাইন আপ' },
+    login_page_askSignUp: { en: "Don't have an account?", bn: 'অ্যাকাউন্ট নেই?' },
+    login_page_askSignIn: { en: 'Already have an account?', bn: 'ইতিমধ্যে একটি অ্যাকাউন্ট আছে?' },
+    login_page_linkSignUp: { en: 'Sign Up', bn: 'সাইন আপ করুন' },
+    login_page_linkSignIn: { en: 'Sign In', bn: 'সাইন ইন করুন' },
+    login_page_confirmEmail: { en: 'Please check your email to confirm your account.', bn: 'আপনার অ্যাকাউন্ট নিশ্চিত করতে দয়া করে আপনার ইমেইল চেক করুন।' },
 };
