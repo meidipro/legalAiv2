@@ -20,8 +20,8 @@ const routes: { [key: string]: (container: HTMLElement) => void } = {
   '/profile': renderUserProfilePage,
 };
 
-// --- NEW: A dedicated function to handle routing and redirects ---
-const navigate = () => {
+// --- A SIMPLIFIED AND MORE RELIABLE ROUTER ---
+const router = () => {
     const session = auth.getSession();
     let path = window.location.pathname;
 
@@ -30,72 +30,77 @@ const navigate = () => {
         path = "/";
     }
 
-    const isAuthPage = (path === '/login');
-    const isProtectedPage = (path === '/app' || path === '/profile');
-
-    // Rule 1: If user is logged in and on the login page, redirect to the app.
-    if (session && isAuthPage) {
-        history.pushState(null, '', '/app');
-        renderAppPage(appContainer);
-        return; // Stop further execution
-    }
-
-    // Rule 2: If user is NOT logged in and tries to access a protected page, redirect to login.
-    if (!session && isProtectedPage) {
+    // This is the ONLY protection rule the router needs.
+    // It prevents guests from accessing pages that have NO guest state.
+    const protectedRoutes = ['/profile'];
+    if (!session && protectedRoutes.includes(path)) {
         history.pushState(null, '', '/login');
-        renderLoginPage(appContainer);
-        return; // Stop further execution
+        path = '/login';
     }
 
-    // Rule 3 (Optional but recommended): If a logged-in user lands on the homepage, send them to the app.
-    if (session && path === '/') {
-        history.pushState(null, '', '/app');
-        renderAppPage(appContainer);
-        return; // Stop further execution
-    }
-
-    // If no redirect rules apply, render the page for the current path.
+    // Render the page for the determined path.
     const renderPage = routes[path] || routes['/'];
     renderPage(appContainer);
 };
 
-// --- Refactored Auth State Listener ---
+// --- A SMARTER AUTH STATE LISTENER ---
 supabase.auth.onAuthStateChange((_event, session) => {
-    console.log("Auth state changed, new session:", session);
     auth.setSession(session);
     renderNavbar(navbarContainer);
-    // Call our new, robust navigation function
-    navigate();
+
+    const currentPath = window.location.pathname;
+
+    // This block handles the LOGOUT event.
+    if (!session) {
+        // If the user was on a page that requires login, redirect them to the homepage.
+        if (currentPath === '/app' || currentPath === '/profile') {
+            history.pushState(null, '', '/');
+            router(); // Render the homepage
+        } else {
+            // Otherwise, just re-render the current public page (e.g., /about)
+            router();
+        }
+    } 
+    // This block handles the LOGIN event.
+    else {
+        // The redirectTo in login.ts handles the main OAuth flow.
+        // This is a fallback for other cases, ensuring if a user logs in
+        // while on the login page, they are sent to the app.
+        if (currentPath === '/login') {
+            history.pushState(null, '', '/app');
+            router();
+        } else {
+            // Re-render the current page with the new session data.
+            router();
+        }
+    }
 });
 
-// --- Refactored Initial Load ---
+// --- INITIAL LOAD ---
 document.addEventListener('DOMContentLoaded', async () => {
   const { data: { session } } = await supabase.auth.getSession();
   auth.setSession(session);
   
   renderNavbar(navbarContainer);
-  // Call our new, robust navigation function
-  navigate();
+  router();
 
-  // Handle client-side navigation (when a user clicks a link)
+  // Standard SPA navigation for internal links
   document.body.addEventListener('click', e => {
     const target = e.target as HTMLElement;
     const link = target.closest('[data-link]') as HTMLAnchorElement;
     if (link) {
       e.preventDefault();
       history.pushState(null, '', link.href);
-      // Call our new, robust navigation function
-      navigate();
+      router();
     }
   });
 
   // Handle browser back/forward buttons
-  window.addEventListener('popstate', navigate);
+  window.addEventListener('popstate', router);
   
   // Handle language changes
   window.addEventListener('languageChange', () => {
     renderNavbar(navbarContainer);
-    // Call our new, robust navigation function
-    navigate();
+    router();
   });
 });

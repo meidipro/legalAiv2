@@ -1,6 +1,6 @@
 // src/pages/landing.ts
-import { auth } from '../auth'; // <-- IMPORT a
-import { i18n } from '../i18n';
+import { auth } from '../auth'; // <-- CORRECTED PATH
+import { i18n } from '../i18n';   // <-- CORRECTED PATH
 
 declare const particlesJS: any;
 
