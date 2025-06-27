@@ -20,52 +20,82 @@ const routes: { [key: string]: (container: HTMLElement) => void } = {
   '/profile': renderUserProfilePage,
 };
 
-const router = async () => {
-  let path = window.location.pathname;
-  if (path === "" || path === "/index.html") path = "/";
+// --- NEW: A dedicated function to handle routing and redirects ---
+const navigate = () => {
+    const session = auth.getSession();
+    let path = window.location.pathname;
 
-  const session = auth.getSession();
-  const protectedRoutes = ['/profile']; 
-  
-  if (!session && protectedRoutes.includes(path)) {
-      history.pushState(null, '', '/login');
-      path = '/login';
-  }
+    // Normalize root path
+    if (path === "" || path === "/index.html") {
+        path = "/";
+    }
 
-  const renderPage = routes[path] || routes['/'];
-  renderPage(appContainer);
+    const isAuthPage = (path === '/login');
+    const isProtectedPage = (path === '/app' || path === '/profile');
+
+    // Rule 1: If user is logged in and on the login page, redirect to the app.
+    if (session && isAuthPage) {
+        history.pushState(null, '', '/app');
+        renderAppPage(appContainer);
+        return; // Stop further execution
+    }
+
+    // Rule 2: If user is NOT logged in and tries to access a protected page, redirect to login.
+    if (!session && isProtectedPage) {
+        history.pushState(null, '', '/login');
+        renderLoginPage(appContainer);
+        return; // Stop further execution
+    }
+
+    // Rule 3 (Optional but recommended): If a logged-in user lands on the homepage, send them to the app.
+    if (session && path === '/') {
+        history.pushState(null, '', '/app');
+        renderAppPage(appContainer);
+        return; // Stop further execution
+    }
+
+    // If no redirect rules apply, render the page for the current path.
+    const renderPage = routes[path] || routes['/'];
+    renderPage(appContainer);
 };
 
+// --- Refactored Auth State Listener ---
 supabase.auth.onAuthStateChange((_event, session) => {
+    console.log("Auth state changed, new session:", session);
     auth.setSession(session);
     renderNavbar(navbarContainer);
-    router();
+    // Call our new, robust navigation function
+    navigate();
 });
 
+// --- Refactored Initial Load ---
 document.addEventListener('DOMContentLoaded', async () => {
   const { data: { session } } = await supabase.auth.getSession();
   auth.setSession(session);
   
   renderNavbar(navbarContainer);
-  router();
+  // Call our new, robust navigation function
+  navigate();
 
+  // Handle client-side navigation (when a user clicks a link)
   document.body.addEventListener('click', e => {
     const target = e.target as HTMLElement;
     const link = target.closest('[data-link]') as HTMLAnchorElement;
     if (link) {
       e.preventDefault();
       history.pushState(null, '', link.href);
-      router();
+      // Call our new, robust navigation function
+      navigate();
     }
   });
 
-  window.addEventListener('popstate', router);
-
-  // Add a global listener for our custom languageChange event.
-  // When the language is changed anywhere in the app, this will fire.
+  // Handle browser back/forward buttons
+  window.addEventListener('popstate', navigate);
+  
+  // Handle language changes
   window.addEventListener('languageChange', () => {
-    // Re-render the navbar and the current page to reflect the new language
     renderNavbar(navbarContainer);
-    router();
+    // Call our new, robust navigation function
+    navigate();
   });
 });
