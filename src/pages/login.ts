@@ -2,11 +2,7 @@
 import { supabase } from '../supabaseClient';
 import { i18n } from '../i18n';
 
-// --- STATE ---
-// 'signIn' or 'signUp'. Default to 'signIn'.
 let authMode: 'signIn' | 'signUp' = 'signIn';
-
-// --- EVENT HANDLERS ---
 
 async function handleGoogleSignIn() {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -26,44 +22,50 @@ async function handleEmailAuth(e: Event) {
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
 
     if (authMode === 'signUp') {
-        // --- SIGN UP LOGIC ---
+        const fullName = (form.elements.namedItem('fullName') as HTMLInputElement).value;
+        if (!fullName) {
+            alert('Please enter your full name.');
+            return;
+        }
+
+        // --- SIGN UP LOGIC with Full Name ---
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                data: {
+                    full_name: fullName // This saves the name to user_metadata
+                }
+            }
         });
-
         if (error) {
             alert(error.message);
         } else {
-            // The onAuthStateChange listener in main.ts will NOT fire for sign-up
-            // until the user confirms their email. So we show a message.
             alert(i18n.t('login_page_confirmEmail'));
             console.log("Sign up successful, user needs to confirm email.", data);
         }
     } else {
-        // --- SIGN IN LOGIC ---
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
-
-        if (error) {
-            alert(error.message);
-        }
-        // If successful, the onAuthStateChange listener in main.ts will handle the redirect.
+        // --- SIGN IN LOGIC (unchanged) ---
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) { alert(error.message); }
     }
 }
 
-// --- RENDER FUNCTION ---
-
 export function renderLoginPage(container: HTMLElement) {
-    // Determine which texts and buttons to show based on the current mode
     const isSignInMode = authMode === 'signIn';
     const title = isSignInMode ? i18n.t('login_page_signInTitle') : i18n.t('login_page_signUpTitle');
     const buttonText = isSignInMode ? i18n.t('login_page_signInButton') : i18n.t('login_page_signUpButton');
     const switchPrompt = isSignInMode ? i18n.t('login_page_askSignUp') : i18n.t('login_page_askSignIn');
     const switchLinkText = isSignInMode ? i18n.t('login_page_linkSignUp') : i18n.t('login_page_linkSignIn');
     
+    // --- Dynamically add the Full Name field for Sign Up mode ---
+    const fullNameFieldHTML = isSignInMode ? '' : `
+      <div class="form-field">
+        <label for="fullName">${i18n.t('login_page_fullNameLabel')}</label>
+        <input type="text" id="fullName" name="fullName" required autocomplete="name">
+      </div>
+    `;
+
     container.innerHTML = `
       <div class="page-container">
         <div class="login-form">
@@ -77,30 +79,32 @@ export function renderLoginPage(container: HTMLElement) {
 
           <div class="login-divider">${i18n.t('login_page_divider')}</div>
 
-          <form id="email-auth-form">
-            <label for="email">${i18n.t('login_page_emailLabel')}</label>
-            <input type="email" id="email" name="email" required autocomplete="email">
-
-            <label for="password">${i18n.t('login_page_passwordLabel')}</label>
-            <input type="password" id="password" name="password" required autocomplete="current-password">
-
+          <form id="email-auth-form" class="email-form">
+            ${fullNameFieldHTML}
+            <div class="form-field">
+                <label for="email">${i18n.t('login_page_emailLabel')}</label>
+                <input type="email" id="email" name="email" required autocomplete="email">
+            </div>
+            <div class="form-field">
+                <label for="password">${i18n.t('login_page_passwordLabel')}</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
             <button type="submit">${buttonText}</button>
           </form>
 
-          <p id="switch-auth-mode" style="margin-top: 24px; font-size: 14px; cursor: pointer;">
-            ${switchPrompt} <a style="color: var(--accent-color-start); font-weight: 600;">${switchLinkText}</a>
+          <p id="switch-auth-mode" class="auth-mode-switch">
+            ${switchPrompt} <a href="#">${switchLinkText}</a>
           </p>
         </div>
       </div>
     `;
 
-    // --- Attach Event Listeners ---
     document.getElementById('google-signin-btn')?.addEventListener('click', handleGoogleSignIn);
     document.getElementById('email-auth-form')?.addEventListener('submit', handleEmailAuth);
     
-    // Add listener to switch between sign-in and sign-up
-    document.getElementById('switch-auth-mode')?.addEventListener('click', () => {
+    document.getElementById('switch-auth-mode')?.addEventListener('click', (e) => {
+        e.preventDefault();
         authMode = (authMode === 'signIn' ? 'signUp' : 'signIn');
-        renderLoginPage(container); // Re-render the page in the new mode
+        renderLoginPage(container);
     });
 }

@@ -224,7 +224,46 @@ body {
 #send-button:hover { transform: scale(1.1); }
 #send-button svg { stroke: white; }
 
+/* Add this to your style.css */
 
+.login-form .email-form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 16px; /* Creates space between form fields */
+}
+
+.login-form .form-field {
+    width: 100%;
+    text-align: left;
+}
+
+.login-form label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.login-form .auth-mode-switch {
+    margin-top: 24px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.login-form .auth-mode-switch a {
+    color: var(--accent-color-start);
+    font-weight: 600;
+    text-decoration: none;
+}
+.login-form .auth-mode-switch a:hover {
+    text-decoration: underline;
+}
+
+/* Make sure your inputs have full width */
+.login-form input {
+    width: 100%;
+}
 
 /* Mobile Responsiveness & Hamburger Menu */
 

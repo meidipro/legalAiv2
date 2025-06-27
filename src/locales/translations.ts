@@ -83,4 +83,6 @@ export const translations = {
     login_page_linkSignUp: { en: 'Sign Up', bn: 'সাইন আপ করুন' },
     login_page_linkSignIn: { en: 'Sign In', bn: 'সাইন ইন করুন' },
     login_page_confirmEmail: { en: 'Please check your email to confirm your account.', bn: 'আপনার অ্যাকাউন্ট নিশ্চিত করতে দয়া করে আপনার ইমেইল চেক করুন।' },
+    // Add this key to your translations object
+    login_page_fullNameLabel: { en: 'Full Name', bn: 'সম্পূর্ণ নাম' },
 };
