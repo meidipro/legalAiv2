@@ -346,9 +346,16 @@ body {
     margin-bottom: 8px;
 }
 
+/* --- THE CORRECTED CODE --- */
+
 .context-role-selector {
+    /* Use flexbox to position items side-by-side */
     display: flex;
-    align-items: center;
+    
+    /* Vertically center the items within the container */
+    align-items: center; 
+    
+    /* Create space between the label and the select box */
     gap: 8px;
 }
 
@@ -356,6 +363,9 @@ body {
     font-size: 14px;
     font-weight: 500;
     color: var(--text-secondary);
+    
+    /* **THE KEY FIX**: Prevent the label text from wrapping to a new line */
+    white-space: nowrap;
 }
 
 .context-role-selector select {
@@ -366,10 +376,10 @@ body {
     color: var(--text-primary);
     font-size: 14px;
 }
+
 .context-role-selector select:focus {
     outline: 2px solid var(--accent-color-start);
 }
-
 /* Mobile Responsiveness & Hamburger Menu */
 
 /* This is the new base style for the hamburger menu. It's hidden by default on desktop. */
