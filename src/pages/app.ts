@@ -34,7 +34,13 @@ export function renderAppPage(container: HTMLElement) {
     const session = auth.getSession();
     const isGuestMode = session === null;
 
-    // --- NEW: Voice Synthesis & Recognition Setup ---
+    const SUGGESTED_QUERIES = [
+        'app_query_1',
+        'app_query_2',
+        'app_query_3',
+        'app_query_4',
+    ];
+
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = SpeechRecognitionAPI ? new SpeechRecognitionAPI() : null;
     const synthesis = window.speechSynthesis;
@@ -50,7 +56,6 @@ export function renderAppPage(container: HTMLElement) {
     }
     const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
   
-    // --- UPDATED HTML with Microphone Button ---
     container.innerHTML = `
       <div class="app-layout">
           <aside class="sidebar">
@@ -107,9 +112,8 @@ export function renderAppPage(container: HTMLElement) {
     const darkModeToggle = document.getElementById('dark-mode-toggle') as HTMLDivElement;
     const themeText = document.getElementById('theme-text') as HTMLSpanElement;
     const userProfileLink = document.getElementById('user-profile-link') as HTMLDivElement;
-    const micButton = document.getElementById('mic-button') as HTMLButtonElement; // New element
+    const micButton = document.getElementById('mic-button') as HTMLButtonElement;
 
-    // --- NEW: Text-to-Speech Function ---
     function speakText(text: string) {
         if (synthesis.speaking) {
             synthesis.cancel();
@@ -127,7 +131,7 @@ export function renderAppPage(container: HTMLElement) {
         utterance.onend = () => {
             lastMessageAvatar?.classList.remove('is-speaking');
         };
-        utterance.onerror = () => { // Ensure class is removed on error too
+        utterance.onerror = () => {
             lastMessageAvatar?.classList.remove('is-speaking');
         };
 
@@ -136,8 +140,6 @@ export function renderAppPage(container: HTMLElement) {
         synthesis.speak(utterance);
     }
     
-    // --- All original functions are here, with one modification to handleFormSubmit ---
-
     function renderSidebar() {
         if (!conversationList) return;
         conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`;
@@ -168,8 +170,23 @@ export function renderAppPage(container: HTMLElement) {
     function renderChatWindow() {
         if (!chatWindow) return;
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
+        
         if (activeConvo && activeConvo.messages.length <= 1) {
-            chatWindow.innerHTML = `<div class="empty-chat-container"> <div class="empty-chat-logo"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg> </div> <h2>${i18n.t('app_emptyChatTitle')}</h2> </div>`;
+            const suggestedQueriesHTML = SUGGESTED_QUERIES.map(key => `
+                <div class="suggested-query-item">${i18n.t(key as any)}</div>
+            `).join('');
+
+            chatWindow.innerHTML = `
+                <div class="empty-chat-container"> 
+                    <div class="empty-chat-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg> 
+                    </div> 
+                    <h2>${i18n.t('app_emptyChatTitle')}</h2> 
+    
+                    <div class="suggested-queries-container">
+                        ${suggestedQueriesHTML}
+                    </div>
+                </div>`;
         } else {
             chatWindow.innerHTML = '';
             if (activeConvo) activeConvo.messages.forEach(msg => displayMessage(msg.text, msg.sender));
@@ -229,8 +246,6 @@ export function renderAppPage(container: HTMLElement) {
         if (appState.conversations.length === 0) {
           await createNewConversation();
         } else if (!appState.activeConversationId) {
-          // This used to call setActiveConversation, now it just sets the ID.
-          // The rendering is handled in initApp after all data is loaded.
           appState.activeConversationId = appState.conversations[0].id;
         }
     }
@@ -383,7 +398,6 @@ export function renderAppPage(container: HTMLElement) {
                     } catch (e) { /* Ignore parsing errors */ }
                 }
             }
-            // Update the final message in the state
             const finalMessageIndex = activeConvo.messages.length - 1;
             if (activeConvo.messages[finalMessageIndex]?.sender === 'ai') {
                 activeConvo.messages[finalMessageIndex].text = fullResponse;
@@ -412,6 +426,7 @@ export function renderAppPage(container: HTMLElement) {
     }
     renderUserProfileLink();
 
+    // --- UPDATED: THIS IS THE CORRECTED INITIALIZATION LOGIC ---
     async function initApp() {
         function setupSpeechRecognition() {
             if (!recognition) {
@@ -424,12 +439,11 @@ export function renderAppPage(container: HTMLElement) {
             recognition.interimResults = false;
             recognition.lang = i18n.getLanguage() === 'bn' ? 'bn-BD' : 'en-US';
 
-            // This is the updated part for the pulsing effect
             recognition.onstart = () => { isListening = true; micButton.classList.add('is-listening'); };
             recognition.onend = () => { isListening = false; micButton.classList.remove('is-listening'); };
             recognition.onerror = (event: SpeechRecognitionErrorEvent) => { 
                 console.error("Speech recognition error", event.error);
-                isListening = false; // Make sure listening stops on error
+                isListening = false;
                 micButton.classList.remove('is-listening');
             };
 
@@ -453,7 +467,18 @@ export function renderAppPage(container: HTMLElement) {
         if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
         conversationList.addEventListener('click', (e) => { if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) { toggleSidebar(); } });
+        
         messageForm.addEventListener('submit', (e) => { e.preventDefault(); handleFormSubmit(); });
+
+        chatWindow.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const queryItem = target.closest('.suggested-query-item');
+            if (queryItem && queryItem.textContent) {
+                messageInput.value = queryItem.textContent;
+                handleFormSubmit();
+            }
+        });
+
         newChatBtn.addEventListener('click', createNewConversation);
         darkModeToggle.addEventListener('click', () => {
           document.body.classList.toggle('dark-mode');
@@ -468,8 +493,12 @@ export function renderAppPage(container: HTMLElement) {
         }
         
         await loadState();
+
+        // ** THE FIX IS HERE: Explicitly render the UI after loading the state **
+        renderSidebar();
+        renderChatWindow();
         
-        setupSpeechRecognition(); // Activate the microphone button
+        setupSpeechRecognition();
     }
 
     initApp();

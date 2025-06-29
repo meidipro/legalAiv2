@@ -380,21 +380,70 @@ body {
 .context-role-selector select:focus {
     outline: 2px solid var(--accent-color-start);
 }
-/* Mobile Responsiveness & Hamburger Menu */
 
-/* This is the new base style for the hamburger menu. It's hidden by default on desktop. */
+/* --- STYLES FOR SUGGESTED QUERIES --- */
+
+.suggested-queries-container {
+  width: 100%;
+  max-width: 700px; /* Adjust this to fit your design */
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Creates a responsive 2-column layout */
+  gap: 12px;
+}
+
+.suggested-query-item {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-color);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-align: left;
+}
+
+.suggested-query-item:hover {
+  border-color: var(--accent-color-start);
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* --- UPDATED Mobile Responsiveness & Hamburger Menu --- */
+
+/* --- CORRECTED Mobile Responsiveness & Hamburger Menu --- */
+
+/* The main navbar is a flex container to align items */
+.navbar {
+    display: flex;
+    align-items: center;
+    padding: 0 24px; /* Default desktop padding */
+}
+
+/* This container holds the links. It will fill the available space on desktop. */
+.navbar-links-container {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-left: 24px;
+}
+
+/* By default, the hamburger menu is hidden on large screens */
 #hamburger-menu {
-    display: none; /* Hidden on desktop */
+    display: none;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 8px;
-    margin-right: 12px; /* Adds space between icon and brand name */
+    padding: 0;
+    margin-left: auto; /* This pushes it to the far right */
+    color: var(--text-primary);
 }
+
 #hamburger-menu svg {
+    width: 28px;
+    height: 28px;
     stroke: var(--text-primary);
-    width: 24px;
-    height: 24px;
 }
 
 #overlay { 
@@ -402,27 +451,22 @@ body {
 }
 
 @media (max-width: 900px) {
-    /* Hide desktop nav elements on mobile */
-    .navbar-left .nav-links, .navbar-right { 
-        display: none; 
-    }
-    
     .navbar {
         padding: 0 16px; /* Adjust padding for mobile */
     }
 
-    .navbar-left { 
-        flex-grow: 1; 
+    /* Hide the container with all the desktop links */
+    .navbar-links-container {
+        display: none; 
     }
     
     /* Show the hamburger menu on mobile */
     #hamburger-menu {
         display: flex; 
         align-items: center; 
-        justify-content: center;
     }
     
-    /* --- Sidebar Styles (Unchanged but included for context) --- */
+    /* --- Sidebar and Overlay Styles (Unchanged) --- */
     .sidebar {
         position: fixed; top: 0; left: 0; bottom: 0; height: 100vh;
         transform: translateX(-100%); z-index: 200;
@@ -433,13 +477,13 @@ body {
         transform: translateX(0); 
     }
     
-    /* --- Overlay Styles (Unchanged but included for context) --- */
     #overlay {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background-color: rgba(0, 0, 0, 0.5); z-index: 199;
         opacity: 0; pointer-events: none; transition: opacity 0.3s ease-in-out;
     }
-    .sidebar.is-open ~ #overlay { 
+    /* This rule was slightly wrong. Corrected to target overlay directly when sidebar is open */
+    .sidebar.is-open + #overlay { 
         display: block; opacity: 1; pointer-events: all; 
     }
 }

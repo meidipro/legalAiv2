@@ -50,6 +50,24 @@ export const translations = {
     app_thinking: { en: '...', bn: 'ভাবছে...' },
     app_error: { en: 'Sorry, an error occurred:', bn: 'দুঃখিত, একটি ত্রুটি ঘটেছে:' },
 
+    // --- App Page Suggested Queries ---
+    app_query_1: {
+        en: 'What are the steps to file for a divorce in Bangladesh?',
+        bn: 'বাংলাদেশে বিবাহবিচ্ছেদের জন্য আবেদন করার পদক্ষেপগুলো কী কী?'
+    },
+    app_query_2: {
+        en: 'Explain the process of buying land and property registration.',
+        bn: 'জমি কেনা এবং সম্পত্তি নিবন্ধনের প্রক্রিয়া ব্যাখ্যা করুন।'
+    },
+    app_query_3: {
+        en: 'What are my rights if I am arrested by the police?',
+        bn: 'পুলিশ দ্বারা গ্রেপ্তার হলে আমার অধিকারগুলো কী কী?'
+    },
+    app_query_4: {
+        en: 'How do I draft a valid legal contract for a small business?',
+        bn: 'আমি কীভাবে একটি ছোট ব্যবসার জন্য একটি বৈধ চুক্তিপত্র তৈরি করব?'
+    },
+
     // --- App Page Modals / Prompts ---
     app_renameTitlePrompt: { en: 'Enter new title:', bn: 'নতুন শিরোনাম দিন:' },
     app_deleteConfirm: { en: 'Are you sure? This action cannot be undone.', bn: 'আপনি কি নিশ্চিত? এই কাজটি পূর্বাবস্থায় ফেরানো সম্ভব নয়।' },
@@ -65,9 +83,7 @@ export const translations = {
     profile_alert_notLoggedInUpdate: { en: 'You must be logged in to update your profile.', bn: 'প্রোফাইল আপডেট করার জন্য আপনাকে অবশ্যই লগইন করতে হবে।' },
     profile_alert_error: { en: 'Error updating profile:', bn: 'প্রোফাইল আপডেট করতে ত্রুটি হয়েছে:' },
     profile_alert_success: { en: 'Profile updated successfully!', bn: 'প্রোফাইল সফলভাবে আপডেট করা হয়েছে!' },
-
-    // Add this inside the main `translations` object in src/locales/translations.ts
-
+    
     // --- Login / Sign Up Page ---
     login_page_signInTitle: { en: 'Sign In to LegalAI', bn: 'LegalAI-তে সাইন ইন করুন' },
     login_page_signUpTitle: { en: 'Create Your Account', bn: 'আপনার অ্যাকাউন্ট তৈরি করুন' },
@@ -83,6 +99,5 @@ export const translations = {
     login_page_linkSignUp: { en: 'Sign Up', bn: 'সাইন আপ করুন' },
     login_page_linkSignIn: { en: 'Sign In', bn: 'সাইন ইন করুন' },
     login_page_confirmEmail: { en: 'Please check your email to confirm your account.', bn: 'আপনার অ্যাকাউন্ট নিশ্চিত করতে দয়া করে আপনার ইমেইল চেক করুন।' },
-    // Add this key to your translations object
     login_page_fullNameLabel: { en: 'Full Name', bn: 'সম্পূর্ণ নাম' },
 };
