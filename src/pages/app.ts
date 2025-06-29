@@ -10,19 +10,19 @@ interface AppState { conversations: Conversation[]; activeConversationId: string
 
 // --- Add type definitions for Web Speech API to avoid TypeScript errors ---
 interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
+    results: SpeechRecognitionResultList;
 }
 interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
+    error: string;
 }
 declare var webkitSpeechRecognition: any;
 declare var SpeechRecognition: any;
 
 declare global {
-  interface Window {
-    SpeechRecognition?: typeof SpeechRecognition;
-    webkitSpeechRecognition?: typeof webkitSpeechRecognition;
-  }
+    interface Window {
+        SpeechRecognition?: typeof SpeechRecognition;
+        webkitSpeechRecognition?: typeof webkitSpeechRecognition;
+    }
 }
 
 export function renderAppPage(container: HTMLElement) {
@@ -55,7 +55,7 @@ export function renderAppPage(container: HTMLElement) {
         return guestId;
     }
     const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
-  
+
     container.innerHTML = `
       <div class="app-layout">
           <aside class="sidebar">
@@ -74,35 +74,41 @@ export function renderAppPage(container: HTMLElement) {
                   <div id="user-profile-link" class="user-profile-link"></div>
               </div>
           </aside>
+
           <main class="main-content">
               <div id="chat-window"></div>
-              <div class="prompt-enhancers">
-                  <div class="context-role-selector">
-                      <label for="role-selector">${i18n.t('app_iAmA')}</label>
-                      <select id="role-selector">
-                          <option value="General Public">${i18n.t('app_role_general')}</option>
-                          <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
-                          <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
-                      </select>
+              
+              <!-- NEW: Wrapper for all bottom controls -->
+              <div class="chat-input-area">
+                  <div class="prompt-enhancers">
+                      <div class="context-role-selector">
+                          <label for="role-selector">${i18n.t('app_iAmA')}</label>
+                          <select id="role-selector">
+                              <option value="General Public">${i18n.t('app_role_general')}</option>
+                              <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
+                              <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
+                          </select>
+                      </div>
                   </div>
-              </div>
-              <div class="message-form-container">
-                  <form id="message-form">
-                      <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
-                      </button>
-                      <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
-                      <button type="submit" id="send-button">
-                          <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                      </button>
-                  </form>
-              </div>
+                  <div class="message-form-container">
+                      <form id="message-form">
+                          <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                          </button>
+                          <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
+                          <button type="submit" id="send-button">
+                              <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                          </button>
+                      </form>
+                  </div>
+              </div> 
+              <!-- End of new wrapper -->
           </main>
           <div id="overlay"></div>
       </div>`;
 
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const hamburgerMenu = document.querySelector('#navbar-container #hamburger-menu') as HTMLButtonElement; 
+    const hamburgerMenu = document.querySelector('#navbar-container #hamburger-menu') as HTMLButtonElement;
     const overlay = document.getElementById('overlay') as HTMLDivElement;
     const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
     const messageForm = document.getElementById('message-form') as HTMLFormElement;
@@ -123,7 +129,7 @@ export function renderAppPage(container: HTMLElement) {
         const langCode = i18n.getLanguage();
         const preferredVoice = voices.find(voice => voice.lang.startsWith(langCode) && voice.name.includes('Google'));
         utterance.voice = preferredVoice || voices.find(voice => voice.lang.startsWith(langCode)) || voices[0];
-        
+
         const lastMessageAvatar = chatWindow.querySelector('.message-wrapper:last-child .ai-avatar');
         utterance.onstart = () => {
             lastMessageAvatar?.classList.add('is-speaking');
@@ -139,7 +145,7 @@ export function renderAppPage(container: HTMLElement) {
         utterance.pitch = 1;
         synthesis.speak(utterance);
     }
-    
+
     function renderSidebar() {
         if (!conversationList) return;
         conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`;
@@ -170,7 +176,7 @@ export function renderAppPage(container: HTMLElement) {
     function renderChatWindow() {
         if (!chatWindow) return;
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
-        
+
         if (activeConvo && activeConvo.messages.length <= 1) {
             const suggestedQueriesHTML = SUGGESTED_QUERIES.map(key => `
                 <div class="suggested-query-item">${i18n.t(key as any)}</div>
@@ -223,17 +229,17 @@ export function renderAppPage(container: HTMLElement) {
         chatWindow.appendChild(messageWrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
-    
+
     function setActiveConversation(id: string) {
         appState.activeConversationId = id;
-        if(window.innerWidth <= 900) {
+        if (window.innerWidth <= 900) {
             sidebar.classList.remove('is-open');
             overlay.classList.remove('is-open');
         }
         renderSidebar();
         renderChatWindow();
     }
-    
+
     async function loadState() {
         if (isGuestMode) {
             const savedState = localStorage.getItem(GUEST_STORAGE_KEY);
@@ -244,17 +250,17 @@ export function renderAppPage(container: HTMLElement) {
             appState = { conversations: data as Conversation[], activeConversationId: null };
         }
         if (appState.conversations.length === 0) {
-          await createNewConversation();
+            await createNewConversation();
         } else if (!appState.activeConversationId) {
-          appState.activeConversationId = appState.conversations[0].id;
+            appState.activeConversationId = appState.conversations[0].id;
         }
     }
-    
+
     async function createNewConversation() {
-        const newConvo: Conversation = { 
-            id: Date.now().toString(), 
-            title: i18n.t('app_newChat'), 
-            messages: [{ sender: 'ai', text: i18n.t('app_initialGreeting') }] 
+        const newConvo: Conversation = {
+            id: Date.now().toString(),
+            title: i18n.t('app_newChat'),
+            messages: [{ sender: 'ai', text: i18n.t('app_initialGreeting') }]
         };
         if (isGuestMode) {
             appState.conversations.unshift(newConvo);
@@ -268,7 +274,7 @@ export function renderAppPage(container: HTMLElement) {
         }
         setActiveConversation(newConvo.id);
     }
-    
+
     async function renameConversation(id: string) {
         if (isGuestMode) return;
         const convo = appState.conversations.find(c => c.id === id);
@@ -280,7 +286,7 @@ export function renderAppPage(container: HTMLElement) {
             else { convo.title = newTitle.trim(); renderSidebar(); }
         }
     }
-    
+
     async function deleteConversation(id: string) {
         if (isGuestMode) return;
         if (!confirm(i18n.t('app_deleteConfirm'))) return;
@@ -300,7 +306,7 @@ export function renderAppPage(container: HTMLElement) {
             }
         }
     }
-    
+
     function shareConversation(id: string, button: HTMLButtonElement): void {
         if (isGuestMode) return;
         const convo = appState.conversations.find(c => c.id === id);
@@ -313,7 +319,7 @@ export function renderAppPage(container: HTMLElement) {
             setTimeout(() => { button.innerHTML = originalContent; button.disabled = false; }, 2000);
         }).catch(err => { console.error('Failed to copy chat:', err); alert('Failed to copy chat.'); });
     }
-    
+
     async function addMessageToActiveConversation(message: Message, difyConversationId?: string) {
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
         if (!activeConvo) return;
@@ -336,26 +342,26 @@ export function renderAppPage(container: HTMLElement) {
         renderSidebar();
         renderChatWindow();
     }
-    
+
     async function handleFormSubmit() {
         const userInput = messageInput.value.trim();
         if (!DIFY_API_KEY) { alert("Dify API Key is not configured."); return; }
         if (!userInput) return;
         if (!appState.activeConversationId) await createNewConversation();
-        
+
         if (synthesis.speaking) { synthesis.cancel(); }
 
         const roleSelectorElement = document.getElementById('role-selector') as HTMLSelectElement | null;
         const selectedRole = roleSelectorElement ? roleSelectorElement.value : "General Public";
         const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
-        if (!activeConvo) return; 
+        if (!activeConvo) return;
 
         messageInput.value = '';
         await addMessageToActiveConversation({ sender: 'user', text: userInput });
-        
+
         displayMessage(i18n.t('app_thinking'), 'ai');
         const tempBubbles = chatWindow.querySelectorAll('.message-wrapper');
-        const tempLastBubble = tempBubbles[tempBubbles.length -1];
+        const tempLastBubble = tempBubbles[tempBubbles.length - 1];
 
         try {
             const DIFY_CHAT_URL = 'https://api.dify.ai/v1/chat-messages';
@@ -364,21 +370,21 @@ export function renderAppPage(container: HTMLElement) {
                 headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     inputs: { "USER_ROLE": selectedRole, "LANGUAGE": i18n.getAiLanguage() },
-                    query: userInput, user: userIdentifier, conversation_id: activeConvo.dify_conversation_id || "", response_mode: 'streaming' 
+                    query: userInput, user: userIdentifier, conversation_id: activeConvo.dify_conversation_id || "", response_mode: 'streaming'
                 })
             });
             if (!response.ok) { const errorBody = await response.text(); throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`); }
             if (!response.body) { throw new Error("API response was successful but had no body."); }
-            
-            if(tempLastBubble) tempLastBubble.remove();
-            
+
+            if (tempLastBubble) tempLastBubble.remove();
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let done = false; let fullResponse = ""; let finalDifyConversationId = activeConvo.dify_conversation_id;
             displayMessage("", 'ai');
             const aiBubbles = chatWindow.querySelectorAll('.message-wrapper.ai .message-bubble');
-            const aiLastBubble = aiBubbles[aiBubbles.length -1] as HTMLDivElement;
-            
+            const aiLastBubble = aiBubbles[aiBubbles.length - 1] as HTMLDivElement;
+
             while (!done) {
                 const { value, done: readerDone } = await reader.read();
                 done = readerDone;
@@ -402,12 +408,12 @@ export function renderAppPage(container: HTMLElement) {
             if (activeConvo.messages[finalMessageIndex]?.sender === 'ai') {
                 activeConvo.messages[finalMessageIndex].text = fullResponse;
             } else {
-                 await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
+                await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
             }
             speakText(fullResponse);
 
         } catch (error) {
-            if(tempLastBubble) tempLastBubble.remove();
+            if (tempLastBubble) tempLastBubble.remove();
             const errorMessage = `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}`;
             await addMessageToActiveConversation({ sender: 'ai', text: errorMessage });
             speakText(errorMessage);
@@ -441,7 +447,7 @@ export function renderAppPage(container: HTMLElement) {
 
             recognition.onstart = () => { isListening = true; micButton.classList.add('is-listening'); };
             recognition.onend = () => { isListening = false; micButton.classList.remove('is-listening'); };
-            recognition.onerror = (event: SpeechRecognitionErrorEvent) => { 
+            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
                 console.error("Speech recognition error", event.error);
                 isListening = false;
                 micButton.classList.remove('is-listening');
@@ -462,12 +468,12 @@ export function renderAppPage(container: HTMLElement) {
                 }
             });
         }
-        
+
         function toggleSidebar() { sidebar.classList.toggle('is-open'); overlay.classList.toggle('is-open'); }
         if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
         conversationList.addEventListener('click', (e) => { if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) { toggleSidebar(); } });
-        
+
         messageForm.addEventListener('submit', (e) => { e.preventDefault(); handleFormSubmit(); });
 
         chatWindow.addEventListener('click', (e) => {
@@ -481,8 +487,8 @@ export function renderAppPage(container: HTMLElement) {
 
         newChatBtn.addEventListener('click', createNewConversation);
         darkModeToggle.addEventListener('click', () => {
-          document.body.classList.toggle('dark-mode');
-          if (themeText) themeText.textContent = document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode');
+            document.body.classList.toggle('dark-mode');
+            if (themeText) themeText.textContent = document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode');
         });
 
         if (isGuestMode) {
@@ -491,13 +497,13 @@ export function renderAppPage(container: HTMLElement) {
             guestNotice.innerHTML = `${i18n.t('app_guestNotice')} <a href="/login" data-link style="color: var(--accent-color-start); font-weight: 500;">${i18n.t('app_guestSignIn')}</a> ${i18n.t('app_guestToSave')}`;
             sidebar.prepend(guestNotice);
         }
-        
+
         await loadState();
 
         // ** THE FIX IS HERE: Explicitly render the UI after loading the state **
         renderSidebar();
         renderChatWindow();
-        
+
         setupSpeechRecognition();
     }
 
