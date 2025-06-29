@@ -412,7 +412,6 @@ body {
 
 /* --- UPDATED Mobile Responsiveness & Hamburger Menu --- */
 
-/* --- CORRECTED Mobile Responsiveness & Hamburger Menu --- */
 
 /* The main navbar is a flex container to align items */
 .navbar {
@@ -485,5 +484,73 @@ body {
     /* This rule was slightly wrong. Corrected to target overlay directly when sidebar is open */
     .sidebar.is-open + #overlay { 
         display: block; opacity: 1; pointer-events: all; 
+    }
+
+}
+/* --- COMPLETE MOBILE RESPONSIVE FIXES --- */
+
+/* This media query targets tablets (portrait) and mobile phones */
+@media (max-width: 900px) {
+
+    /* 1. Fix the main content area layout */
+    /* -- Main Content Area Rules -- */
+    .main-content {
+        padding: 0 0 16px 0; /* Changed padding to handle carousel edges */
+        overflow-x: hidden;
+    }
+    .empty-chat-container h2 {
+        font-size: 22px;
+        text-align: center;
+        margin-bottom: 20px;
+        padding: 0 16px; /* Add padding here instead */
+    }
+
+    /* --- NEW: COMPACT LIST STYLES --- */
+
+    /* 1. Change the container from a grid to a simple block */
+    .suggested-queries-container {
+        display: block; /* This will stack items vertically by default */
+        border: 1px solid var(--border-color); /* Add a border around the whole list */
+        border-radius: 10px; /* Rounded corners for the list container */
+        overflow: hidden; /* Ensures child borders don't poke out */
+    }
+
+    /* 2. Style each item as a list item instead of a card */
+    .suggested-query-item {
+        /* Remove card-like appearance */
+        background: none;
+        border: none;
+        border-radius: 0;
+
+        /* Add a subtle line to separate items */
+        border-bottom: 1px solid var(--border-color);
+        
+        /* Adjust padding for a list-like feel */
+        padding: 14px 16px;
+        width: 100%;
+        text-align: left;
+    }
+
+    /* 3. Remove the border from the very last item */
+    .suggested-query-item:last-child {
+        border-bottom: none;
+    }
+
+    /* --- END OF COMPACT LIST STYLES --- */
+
+
+    /* -- Bottom Controls Rules (Unchanged) -- */
+    .prompt-enhancers,
+    .message-form-container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 16px; /* Add consistent padding */
+    }
+    .context-role-selector {
+        justify-content: center;
+        margin-top: 16px; /* Add space above the role selector */
+    }
+    .message-form-container {
+        padding-top: 8px;
     }
 }
