@@ -36,10 +36,10 @@
 }
 
 /* --- UPDATED GLOBAL & BODY STYLES --- */
-* { 
-    box-sizing: border-box; 
-    margin: 0; 
-    padding: 0; 
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 html, body {
@@ -49,15 +49,15 @@ html, body {
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* This prevents the main browser page from scrolling */
+    /* This is key: prevents the main browser scrollbar */
     overflow: hidden; 
 }
 
-/* 2. Main App Container Setup */
+/* Make the #app container a vertical flexbox that fills the body */
 #app {
     height: 100%;
     display: flex;
-    flex-direction: column; /* Stacks header on top of the main app layout */
+    flex-direction: column;
 }
 
 /* --- NAVBAR STYLES --- */
@@ -134,36 +134,21 @@ html, body {
 .google-signin { background-color: #DB4437; }
 
 /* --- CHAT APP STYLES --- */
-/* 3. Corrected App Layout Rules */
-.app-layout {
-    display: flex;
-    /* This makes the layout fill all remaining height after the navbar */
-    flex-grow: 1; 
-    /* This is a crucial fix for flex items to prevent them from overflowing their container */
-    min-height: 0; 
-    width: 100%;
-}
-
+.app-layout { 
+    display: flex; 
+    width: 100%; 
+    height: calc(100vh - 72px); 
+    position: relative; 
+    overflow-x: hidden; }
 .sidebar {
-    width: 280px;
-    background-color: var(--bg-soft);
-    border-right: 1px solid var(--border-color);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
+    width: 280px; background-color: var(--bg-soft); border-right: 1px solid var(--border-color);
+    padding: 16px; display: flex; flex-direction: column; flex-shrink: 0;
     transition: transform 0.3s ease-in-out;
 }
-
 .main-content {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-main);
-    /* A necessary fix for flex items to prevent content overflow */
-    min-width: 0; 
+    flex-grow: 1; display: flex; flex-direction: column; height: 100%;
+    position: relative; background-color: var(--bg-main);
 }
-
 .sidebar-top {
     flex-shrink: 0;
     border-bottom: 1px solid var(--border-color);
@@ -219,23 +204,12 @@ html, body {
 #dark-mode-toggle:hover { background-color: var(--border-color); }
 
 /* Chat Window & Messages */
-#chat-window {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 24px 5%;
-    display: flex;
-    flex-direction: column;
-}
-/* This new wrapper holds the prompt box and form */
-.chat-input-area {
-    /* This is crucial: it prevents the area from being squished */
-    flex-shrink: 0; 
-    
-    /* Add padding and a border for a nice visual separation */
-    padding: 16px 5%;
-    border-top: 1px solid var(--border-color);
-}
-
+#chat-window { 
+    flex-grow: 1; 
+    overflow-y: auto; 
+    padding: 24px 5%; 
+    display: flex; 
+    flex-direction: column; }
 .empty-chat-container {
     flex-grow: 1; display: flex; align-items: center; justify-content: center;
     text-align: center; flex-direction: column; margin: auto; padding-bottom: 10vh;
@@ -596,7 +570,6 @@ html, body {
     /* -- Bottom Controls Rules (Unchanged) -- */
     .prompt-enhancers,
     .message-form-container {
-        flex-shrink: 0;
         width: 100%;
         max-width: 100%;
         padding: 0 16px; /* Add consistent padding */
