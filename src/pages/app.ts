@@ -240,6 +240,7 @@ export function renderAppPage(container: HTMLElement) {
         renderChatWindow();
     }
 
+    // REPLACE with this version
     async function loadState() {
         if (isGuestMode) {
             const savedState = localStorage.getItem(GUEST_STORAGE_KEY);
@@ -249,11 +250,23 @@ export function renderAppPage(container: HTMLElement) {
             if (error) { console.error("Error fetching:", error); appState = { conversations: [], activeConversationId: null }; return; }
             appState = { conversations: data as Conversation[], activeConversationId: null };
         }
-        if (appState.conversations.length === 0) {
-            await createNewConversation();
-        } else if (!appState.activeConversationId) {
-            appState.activeConversationId = appState.conversations[0].id;
-        }
+        // We no longer automatically set an active conversation here.
+        // We also don't create a new one here anymore.
+    }
+
+    // ADD THIS NEW FUNCTION
+    function startNewChatView() {
+        // Create a temporary conversation object
+        const tempConvo: Conversation = {
+            id: 'new-chat-session', // A special ID to identify it
+            title: i18n.t('app_newChat'),
+            messages: [{ sender: 'ai', text: i18n.t('app_initialGreeting') }]
+        };
+
+        // Add it to the top of the list without saving
+        appState.conversations.unshift(tempConvo);
+        // Make it active
+        setActiveConversation(tempConvo.id);
     }
 
     async function createNewConversation() {
@@ -363,22 +376,57 @@ export function renderAppPage(container: HTMLElement) {
         renderChatWindow();
     }
 
+    // REPLACE your handleFormSubmit with this new version
     async function handleFormSubmit() {
         const userInput = messageInput.value.trim();
         if (!DIFY_API_KEY) { alert("Dify API Key is not configured."); return; }
         if (!userInput) return;
-        if (!appState.activeConversationId) await createNewConversation();
+        
+        let activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
+        if (!activeConvo) return; 
+
+        // --- NEW LOGIC STARTS HERE ---
+        // If this is the temporary "new chat" session, save it first
+        if (activeConvo.id === 'new-chat-session' && !isGuestMode) {
+            // Remove the temporary chat from the state
+            appState.conversations.shift(); 
+            
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                // Create a new conversation in the database
+                const { data: newDbConvo, error } = await supabase
+                    .from('conversations')
+                    .insert({ 
+                        user_id: user.id, 
+                        title: userInput.substring(0, 25) + (userInput.length > 25 ? '...' : ''), // Title from first message
+                        messages: [activeConvo.messages[0]] // Just the initial greeting
+                    })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error("Error creating initial conversation:", error);
+                    // Optional: add the temp chat back on failure
+                    startNewChatView();
+                    return;
+                }
+
+                // Add the REAL conversation from the DB to our state
+                appState.conversations.unshift(newDbConvo as Conversation);
+                appState.activeConversationId = newDbConvo.id;
+                activeConvo = newDbConvo as Conversation; // Update activeConvo to the real one
+            }
+        }
+        // --- NEW LOGIC ENDS HERE ---
 
         if (synthesis.speaking) { synthesis.cancel(); }
 
         const roleSelectorElement = document.getElementById('role-selector') as HTMLSelectElement | null;
         const selectedRole = roleSelectorElement ? roleSelectorElement.value : "General Public";
-        const activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
-        if (!activeConvo) return;
 
         messageInput.value = '';
         await addMessageToActiveConversation({ sender: 'user', text: userInput });
-
+        
         displayMessage(i18n.t('app_thinking'), 'ai');
         const tempBubbles = chatWindow.querySelectorAll('.message-wrapper');
         const tempLastBubble = tempBubbles[tempBubbles.length - 1];
@@ -524,23 +572,33 @@ export function renderAppPage(container: HTMLElement) {
             sidebar.prepend(guestNotice);
         }
 
+        // First, load the user's saved conversations into the state
         await loadState();
+
+        // THEN, create the temporary "new chat" view for the user to see
+        if (appState.conversations.find(c => c.id === 'new-chat-session')) {
+            // If a temp session already exists (e.g. from language switch), just render
+            setActiveConversation('new-chat-session');
+        } else {
+            startNewChatView();
+        }
+
         renderUserProfileLink();
         setupSpeechRecognition();
+
+        // Add these listeners inside your initApp() function
+
+        sidebarLangSwitcher?.querySelector('.lang-en')?.addEventListener('click', () => {
+            if (i18n.getLanguage() !== 'en') {
+                i18n.setLanguage('en');
+            }
+        });
+
+        sidebarLangSwitcher?.querySelector('.lang-bn')?.addEventListener('click', () => {
+            if (i18n.getLanguage() !== 'bn') {
+                i18n.setLanguage('bn');
+            }
+        });
     }
-    // Add these listeners inside your initApp() function
-
-    sidebarLangSwitcher?.querySelector('.lang-en')?.addEventListener('click', () => {
-        if (i18n.getLanguage() !== 'en') {
-            i18n.setLanguage('en');
-        }
-    });
-
-    sidebarLangSwitcher?.querySelector('.lang-bn')?.addEventListener('click', () => {
-        if (i18n.getLanguage() !== 'bn') {
-            i18n.setLanguage('bn');
-        }
-    });
-
     initApp();
 }
