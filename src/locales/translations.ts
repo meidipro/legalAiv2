@@ -1,5 +1,3 @@
-// src/locales/translations.ts
-
 export const translations = {
     // --- Navbar ---
     nav_myChats: { en: 'My Chats', bn: 'আমার চ্যাটসমূহ' },

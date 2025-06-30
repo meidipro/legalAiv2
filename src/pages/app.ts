@@ -1,4 +1,3 @@
-// src/pages/app.ts
 import { supabase } from '../supabaseClient';
 import { auth } from '../auth';
 import { i18n } from '../i18n';
@@ -34,6 +33,7 @@ export function renderAppPage(container: HTMLElement) {
     const session = auth.getSession();
     const isGuestMode = session === null;
 
+    // --- NEW: Define suggested queries using i18n for translation ---
     const SUGGESTED_QUERIES = [
         'app_query_1',
         'app_query_2',
@@ -41,6 +41,7 @@ export function renderAppPage(container: HTMLElement) {
         'app_query_4',
     ];
 
+    // --- Voice Synthesis & Recognition Setup ---
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = SpeechRecognitionAPI ? new SpeechRecognitionAPI() : null;
     const synthesis = window.speechSynthesis;
@@ -56,59 +57,62 @@ export function renderAppPage(container: HTMLElement) {
     }
     const userIdentifier = session?.user?.id || getOrCreateGuestUserId();
 
+    // --- HTML Structure ---
     container.innerHTML = `
-      <div class="app-layout">
-          <aside class="sidebar">
-              <div class="sidebar-top">
-                <button class="new-chat-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    ${i18n.t('app_newChat')}
-                </button>
+  <div class="app-layout">
+      <aside class="sidebar">
+          <div class="sidebar-top">
+            <button class="new-chat-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                ${i18n.t('app_newChat')}
+            </button>
+            
+            <div class="sidebar-role-selector">
+                <label for="role-selector">${i18n.t('app_iAmA')}</label>
+                <select id="role-selector">
+                    <option value="General Public">${i18n.t('app_role_general')}</option>
+                    <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
+                    <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
+                </select>
+            </div>
+          </div>
+          <div class="conversation-list"><h2>${i18n.t('app_history')}</h2></div>
+          <div class="sidebar-footer">
+              <div id="dark-mode-toggle">
+                   <svg class="icon" id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+                   <span id="theme-text">${document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode')}</span>
               </div>
-              <div class="conversation-list"><h2>${i18n.t('app_history')}</h2></div>
-              <div class="sidebar-footer">
-                  <div id="dark-mode-toggle">
-                       <svg class="icon" id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
-                       <span id="theme-text">${document.body.classList.contains('dark-mode') ? i18n.t('app_lightMode') : i18n.t('app_darkMode')}</span>
-                  </div>
-                  <div id="user-profile-link" class="user-profile-link"></div>
-              </div>
-          </aside>
 
-          <main class="main-content">
-              <div id="chat-window"></div>
-              
-              <!-- NEW: Wrapper for all bottom controls -->
-              <div class="chat-input-area">
-                  <div class="prompt-enhancers">
-                      <div class="context-role-selector">
-                          <label for="role-selector">${i18n.t('app_iAmA')}</label>
-                          <select id="role-selector">
-                              <option value="General Public">${i18n.t('app_role_general')}</option>
-                              <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
-                              <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
-                          </select>
-                      </div>
-                  </div>
-                  <div class="message-form-container">
-                      <form id="message-form">
-                          <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
-                          </button>
-                          <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
-                          <button type="submit" id="send-button">
-                              <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                          </button>
-                      </form>
-                  </div>
-              </div> 
-              <!-- End of new wrapper -->
-          </main>
-          <div id="overlay"></div>
-      </div>`;
+              <!-- Language Switcher Sidebar -->
+              <div id="sidebar-lang-switcher" class="language-switcher-sidebar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                  <span class="lang-en ${i18n.getLanguage() === 'en' ? 'lang-active' : ''}">EN</span>
+                  <span>/</span>
+                  <span class="lang-bn ${i18n.getLanguage() === 'bn' ? 'lang-active' : ''}">বাং</span>
+              </div>
+              <!-- End Language Switcher Sidebar -->
+
+              <div id="user-profile-link" class="user-profile-link"></div>
+          </div>
+      </aside>
+      <main class="main-content">
+          <div id="chat-window"></div>
+          <div class="message-form-container">
+              <form id="message-form">
+                  <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                  </button>
+                  <input type="text" id="message-input" placeholder="${i18n.t('app_askAnything')}" autocomplete="off" required>
+                  <button type="submit" id="send-button">
+                      <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                  </button>
+              </form>
+          </div>
+      </main>
+      <div id="overlay"></div>
+  </div>`;
 
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const hamburgerMenu = document.querySelector('#navbar-container #hamburger-menu') as HTMLButtonElement;
     const overlay = document.getElementById('overlay') as HTMLDivElement;
     const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
     const messageForm = document.getElementById('message-form') as HTMLFormElement;
@@ -119,6 +123,7 @@ export function renderAppPage(container: HTMLElement) {
     const themeText = document.getElementById('theme-text') as HTMLSpanElement;
     const userProfileLink = document.getElementById('user-profile-link') as HTMLDivElement;
     const micButton = document.getElementById('mic-button') as HTMLButtonElement;
+    const sidebarLangSwitcher = document.getElementById('sidebar-lang-switcher');
 
     function speakText(text: string) {
         if (synthesis.speaking) {
@@ -131,21 +136,16 @@ export function renderAppPage(container: HTMLElement) {
         utterance.voice = preferredVoice || voices.find(voice => voice.lang.startsWith(langCode)) || voices[0];
 
         const lastMessageAvatar = chatWindow.querySelector('.message-wrapper:last-child .ai-avatar');
-        utterance.onstart = () => {
-            lastMessageAvatar?.classList.add('is-speaking');
-        };
-        utterance.onend = () => {
-            lastMessageAvatar?.classList.remove('is-speaking');
-        };
-        utterance.onerror = () => {
-            lastMessageAvatar?.classList.remove('is-speaking');
-        };
+        utterance.onstart = () => { lastMessageAvatar?.classList.add('is-speaking'); };
+        utterance.onend = () => { lastMessageAvatar?.classList.remove('is-speaking'); };
+        utterance.onerror = () => { lastMessageAvatar?.classList.remove('is-speaking'); };
 
         utterance.rate = 1;
         utterance.pitch = 1;
         synthesis.speak(utterance);
     }
 
+    // --- UPDATED ---
     function renderSidebar() {
         if (!conversationList) return;
         conversationList.innerHTML = `<h2>${i18n.t('app_history')}</h2>`;
@@ -153,21 +153,22 @@ export function renderAppPage(container: HTMLElement) {
             const convoItem = document.createElement('div');
             convoItem.className = 'conversation-item';
             if (convo.id === appState.activeConversationId) convoItem.classList.add('active');
+
             const titleArea = document.createElement('div');
             titleArea.className = 'conversation-title-area';
             titleArea.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 21 1.65-3.8a9 9 0 1 1 3.4 2.9l-5.05.9"></path></svg><span>${convo.title}</span>`;
             titleArea.addEventListener('click', () => setActiveConversation(convo.id));
             convoItem.appendChild(titleArea);
+
             const actionsMenu = document.createElement('div');
             actionsMenu.className = 'conversation-actions';
             actionsMenu.innerHTML = `<button class="action-btn rename-btn" title="Rename"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button><button class="action-btn share-btn" title="Share"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg></button><button class="action-btn delete-btn" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
-            if (isGuestMode) {
-                actionsMenu.querySelectorAll('button').forEach(btn => { (btn as HTMLButtonElement).disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; btn.setAttribute('title', 'Sign in to use this feature'); });
-            } else {
-                actionsMenu.querySelector('.rename-btn')?.addEventListener('click', (e) => { e.stopPropagation(); renameConversation(convo.id); });
-                actionsMenu.querySelector('.share-btn')?.addEventListener('click', (e) => { e.stopPropagation(); shareConversation(convo.id, e.currentTarget as HTMLButtonElement); });
-                actionsMenu.querySelector('.delete-btn')?.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(convo.id); });
-            }
+
+            // Listeners are now added for both guest and logged-in users
+            actionsMenu.querySelector('.rename-btn')?.addEventListener('click', (e) => { e.stopPropagation(); renameConversation(convo.id); });
+            actionsMenu.querySelector('.share-btn')?.addEventListener('click', (e) => { e.stopPropagation(); shareConversation(convo.id, e.currentTarget as HTMLButtonElement); });
+            actionsMenu.querySelector('.delete-btn')?.addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(convo.id); });
+
             convoItem.appendChild(actionsMenu);
             conversationList.appendChild(convoItem);
         });
@@ -188,7 +189,6 @@ export function renderAppPage(container: HTMLElement) {
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.153.34c-1.325 0-2.59-.523-3.536-1.465l-2.62-2.62m5.156 0l-2.62 2.62m-5.156 0l-2.62-2.62m6.75-10.726C12 4.5 11.25 4.5 10.5 4.5c-1.01 0-2.01.143-3 .52m3-.52l-2.62 10.726" /></svg> 
                     </div> 
                     <h2>${i18n.t('app_emptyChatTitle')}</h2> 
-    
                     <div class="suggested-queries-container">
                         ${suggestedQueriesHTML}
                     </div>
@@ -275,40 +275,60 @@ export function renderAppPage(container: HTMLElement) {
         setActiveConversation(newConvo.id);
     }
 
+    // --- UPDATED ---
     async function renameConversation(id: string) {
-        if (isGuestMode) return;
         const convo = appState.conversations.find(c => c.id === id);
         if (!convo) return;
+
         const newTitle = prompt(i18n.t('app_renameTitlePrompt'), convo.title);
         if (newTitle && newTitle.trim() !== "") {
-            const { error } = await supabase.from('conversations').update({ title: newTitle.trim() }).eq('id', id);
-            if (error) { console.error("Error renaming:", error); }
-            else { convo.title = newTitle.trim(); renderSidebar(); }
+            convo.title = newTitle.trim();
+
+            if (isGuestMode) {
+                localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
+            } else {
+                const { error } = await supabase.from('conversations').update({ title: newTitle.trim() }).eq('id', id);
+                if (error) {
+                    console.error("Error renaming:", error);
+                    return;
+                }
+            }
+            renderSidebar();
         }
     }
 
+    // --- UPDATED ---
     async function deleteConversation(id: string) {
-        if (isGuestMode) return;
         if (!confirm(i18n.t('app_deleteConfirm'))) return;
-        const { error } = await supabase.from('conversations').delete().eq('id', id);
-        if (error) { console.error("Error deleting:", error); return; }
-        const index = appState.conversations.findIndex(c => c.id === id);
-        if (index > -1) {
-            appState.conversations.splice(index, 1);
-            if (appState.activeConversationId === id) {
-                if (appState.conversations.length > 0) {
-                    setActiveConversation(appState.conversations[0].id);
-                } else {
-                    await createNewConversation();
-                }
-            } else {
-                renderSidebar();
+
+        if (isGuestMode) {
+            const index = appState.conversations.findIndex(c => c.id === id);
+            if (index > -1) {
+                appState.conversations.splice(index, 1);
+                localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
+            }
+        } else {
+            const { error } = await supabase.from('conversations').delete().eq('id', id);
+            if (error) { console.error("Error deleting:", error); return; }
+            const index = appState.conversations.findIndex(c => c.id === id);
+            if (index > -1) {
+                appState.conversations.splice(index, 1);
             }
         }
+
+        if (appState.activeConversationId === id) {
+            if (appState.conversations.length > 0) {
+                setActiveConversation(appState.conversations[0].id);
+            } else {
+                await createNewConversation();
+            }
+        } else {
+            renderSidebar();
+        }
     }
 
+    // --- UPDATED ---
     function shareConversation(id: string, button: HTMLButtonElement): void {
-        if (isGuestMode) return;
         const convo = appState.conversations.find(c => c.id === id);
         if (!convo) return;
         const formattedChat = `Conversation: ${convo.title}\n\n` + convo.messages.map(msg => `${msg.sender === 'user' ? 'You' : 'LegalAI'}:\n${msg.text}`).join('\n\n');
@@ -422,17 +442,16 @@ export function renderAppPage(container: HTMLElement) {
 
     function renderUserProfileLink() {
         if (!userProfileLink) return;
-        const user = session?.user;
-        if (user) {
-            const userInitial = user.email?.charAt(0).toUpperCase() || 'P';
-            userProfileLink.innerHTML = `<a href="/profile" data-link><div class="avatar user-avatar">${userInitial}</div><span>${user.email}</span></a>`;
-        } else {
+
+        if (isGuestMode) {
             userProfileLink.innerHTML = `<a href="/login" class="nav-button nav-button-primary" data-link>${i18n.t('app_signUpToSave')}</a>`;
+        } else {
+            const user = session?.user;
+            const userInitial = user?.email?.charAt(0).toUpperCase() || 'P';
+            userProfileLink.innerHTML = `<a href="/profile" data-link><div class="avatar user-avatar">${userInitial}</div><span>${user?.email}</span></a>`;
         }
     }
-    renderUserProfileLink();
 
-    // --- UPDATED: THIS IS THE CORRECTED INITIALIZATION LOGIC ---
     async function initApp() {
         function setupSpeechRecognition() {
             if (!recognition) {
@@ -469,13 +488,20 @@ export function renderAppPage(container: HTMLElement) {
             });
         }
 
-        function toggleSidebar() { sidebar.classList.toggle('is-open'); overlay.classList.toggle('is-open'); }
-        if (hamburgerMenu) hamburgerMenu.addEventListener('click', toggleSidebar);
+        function toggleSidebar() {
+            sidebar.classList.toggle('is-open');
+            overlay.classList.toggle('is-open');
+        }
+
+        document.addEventListener('toggle-sidebar', toggleSidebar);
         overlay.addEventListener('click', toggleSidebar);
-        conversationList.addEventListener('click', (e) => { if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) { toggleSidebar(); } });
+        conversationList.addEventListener('click', (e) => {
+            if (window.innerWidth <= 900 && (e.target as HTMLElement).closest('.conversation-item')) {
+                toggleSidebar();
+            }
+        });
 
         messageForm.addEventListener('submit', (e) => { e.preventDefault(); handleFormSubmit(); });
-
         chatWindow.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
             const queryItem = target.closest('.suggested-query-item');
@@ -493,19 +519,28 @@ export function renderAppPage(container: HTMLElement) {
 
         if (isGuestMode) {
             const guestNotice = document.createElement('div');
-            guestNotice.style.cssText = 'background-color: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 8px; text-align: center; font-size: 14px; border-radius: 8px; margin-bottom: 16px;';
+            guestNotice.style.cssText = 'background-color: var(--bg-soft); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 8px 12px; text-align: center; font-size: 14px; border-radius: 8px; margin-bottom: 16px;';
             guestNotice.innerHTML = `${i18n.t('app_guestNotice')} <a href="/login" data-link style="color: var(--accent-color-start); font-weight: 500;">${i18n.t('app_guestSignIn')}</a> ${i18n.t('app_guestToSave')}`;
             sidebar.prepend(guestNotice);
         }
 
         await loadState();
-
-        // ** THE FIX IS HERE: Explicitly render the UI after loading the state **
-        renderSidebar();
-        renderChatWindow();
-
+        renderUserProfileLink();
         setupSpeechRecognition();
     }
+    // Add these listeners inside your initApp() function
+
+    sidebarLangSwitcher?.querySelector('.lang-en')?.addEventListener('click', () => {
+        if (i18n.getLanguage() !== 'en') {
+            i18n.setLanguage('en');
+        }
+    });
+
+    sidebarLangSwitcher?.querySelector('.lang-bn')?.addEventListener('click', () => {
+        if (i18n.getLanguage() !== 'bn') {
+            i18n.setLanguage('bn');
+        }
+    });
 
     initApp();
 }
