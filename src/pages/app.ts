@@ -1,3 +1,4 @@
+import { marked } from 'marked'; // <-- Add this import at the top
 import { supabase } from '../supabaseClient';
 import { auth } from '../auth';
 import { i18n } from '../i18n';
@@ -215,17 +216,53 @@ export function renderAppPage(container: HTMLElement) {
         }
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
-        if (sender !== 'user') {
+
+        if (sender === 'ai') { // Only show sender name for AI
             const senderName = document.createElement('div');
             senderName.className = 'sender-name';
             senderName.textContent = i18n.t('app_aiSenderName');
             messageContent.appendChild(senderName);
         }
+
         const messageBubble = document.createElement('div');
         messageBubble.className = 'message-bubble';
-        messageBubble.innerText = text;
+        
+        if (sender === 'ai') {
+            const parsed = marked.parse(text, { gfm: true });
+            if (parsed instanceof Promise) {
+                parsed.then(html => { messageBubble.innerHTML = html; });
+            } else {
+                messageBubble.innerHTML = parsed;
+            }
+        } else {
+            messageBubble.innerText = text;
+        }
         messageContent.appendChild(messageBubble);
-        if (sender === 'user') { messageWrapper.appendChild(messageContent); messageWrapper.appendChild(avatar); } else { messageWrapper.appendChild(avatar); messageWrapper.appendChild(messageContent); }
+
+        // --- NEW: Add Speaker Button for AI messages ---
+        if (sender === 'ai' && text.trim() !== "") {
+            const speakButton = document.createElement('button');
+            speakButton.className = 'speak-btn';
+            speakButton.title = 'Read this message aloud';
+            speakButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+            
+            // Add the click listener directly
+            speakButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevents any other click events from firing
+                speakText(text); // Call speakText with the raw text content
+            });
+            
+            messageContent.appendChild(speakButton);
+        }
+        // --- END OF NEW CODE ---
+
+        if (sender === 'user') { 
+            messageWrapper.appendChild(messageContent); 
+            messageWrapper.appendChild(avatar); 
+        } else { 
+            messageWrapper.appendChild(avatar); 
+            messageWrapper.appendChild(messageContent); 
+        }
         chatWindow.appendChild(messageWrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
@@ -386,35 +423,29 @@ export function renderAppPage(container: HTMLElement) {
         if (!activeConvo) return; 
 
         // --- NEW LOGIC STARTS HERE ---
-        // If this is the temporary "new chat" session, save it first
         if (activeConvo.id === 'new-chat-session' && !isGuestMode) {
-            // Remove the temporary chat from the state
             appState.conversations.shift(); 
-            
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                // Create a new conversation in the database
                 const { data: newDbConvo, error } = await supabase
                     .from('conversations')
                     .insert({ 
                         user_id: user.id, 
-                        title: userInput.substring(0, 25) + (userInput.length > 25 ? '...' : ''), // Title from first message
-                        messages: [activeConvo.messages[0]] // Just the initial greeting
+                        title: userInput.substring(0, 25) + (userInput.length > 25 ? '...' : ''), 
+                        messages: [activeConvo.messages[0]]
                     })
                     .select()
                     .single();
 
                 if (error) {
                     console.error("Error creating initial conversation:", error);
-                    // Optional: add the temp chat back on failure
                     startNewChatView();
                     return;
                 }
 
-                // Add the REAL conversation from the DB to our state
                 appState.conversations.unshift(newDbConvo as Conversation);
                 appState.activeConversationId = newDbConvo.id;
-                activeConvo = newDbConvo as Conversation; // Update activeConvo to the real one
+                activeConvo = newDbConvo as Conversation;
             }
         }
         // --- NEW LOGIC ENDS HERE ---
@@ -462,11 +493,18 @@ export function renderAppPage(container: HTMLElement) {
                     try {
                         const jsonStr = line.substring(6);
                         if (jsonStr.trim() === '[DONE]') continue;
-                        const parsed = JSON.parse(jsonStr);
-                        if (parsed.conversation_id) finalDifyConversationId = parsed.conversation_id;
-                        if (parsed.event === 'agent_message' || parsed.event === 'message') {
-                            fullResponse += parsed.answer;
-                            aiLastBubble.innerText = fullResponse;
+                        const parsedJson = JSON.parse(jsonStr);
+                        if (parsedJson.conversation_id) finalDifyConversationId = parsedJson.conversation_id;
+                        if (parsedJson.event === 'agent_message' || parsedJson.event === 'message') {
+                            fullResponse += parsedJson.answer;
+                            // --- Streaming Markdown update ---
+                            const parsedMarkdown = marked.parse(fullResponse, { gfm: true });
+                            if (parsedMarkdown instanceof Promise) {
+                                parsedMarkdown.then(html => { aiLastBubble.innerHTML = html; });
+                            } else {
+                                aiLastBubble.innerHTML = parsedMarkdown;
+                            }
+                            // --- End streaming Markdown update ---
                             chatWindow.scrollTop = chatWindow.scrollHeight;
                         }
                     } catch (e) { /* Ignore parsing errors */ }
@@ -478,7 +516,6 @@ export function renderAppPage(container: HTMLElement) {
             } else {
                 await addMessageToActiveConversation({ sender: 'ai', text: fullResponse }, finalDifyConversationId);
             }
-            speakText(fullResponse);
 
         } catch (error) {
             if (tempLastBubble) tempLastBubble.remove();
@@ -488,6 +525,7 @@ export function renderAppPage(container: HTMLElement) {
         }
     }
 
+    // --- UPDATED ---
     function renderUserProfileLink() {
         if (!userProfileLink) return;
 
