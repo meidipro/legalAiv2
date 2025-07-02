@@ -217,7 +217,7 @@ export function renderAppPage(container: HTMLElement) {
         const messageContent = document.createElement('div');
         messageContent.className = 'message-content';
 
-        if (sender === 'ai') { // Only show sender name for AI
+        if (sender === 'ai') {
             const senderName = document.createElement('div');
             senderName.className = 'sender-name';
             senderName.textContent = i18n.t('app_aiSenderName');
@@ -239,22 +239,55 @@ export function renderAppPage(container: HTMLElement) {
         }
         messageContent.appendChild(messageBubble);
 
-        // --- NEW: Add Speaker Button for AI messages ---
-        if (sender === 'ai' && text.trim() !== "") {
+        // --- COMBINED CONTROLS FOR AI MESSAGES ---
+        if (sender === 'ai' && text.trim() !== "" && !text.includes('Sorry, an error occurred')) {
+            const controlsWrapper = document.createElement('div');
+            controlsWrapper.className = 'message-controls';
+
+            // Speaker Button
             const speakButton = document.createElement('button');
             speakButton.className = 'speak-btn';
             speakButton.title = 'Read this message aloud';
             speakButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
-            
-            // Add the click listener directly
             speakButton.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevents any other click events from firing
-                speakText(text); // Call speakText with the raw text content
+                e.stopPropagation();
+                speakText(text);
             });
             
-            messageContent.appendChild(speakButton);
+            // Feedback Buttons
+            const feedbackControls = document.createElement('div');
+            feedbackControls.className = 'feedback-controls';
+            const thumbUp = document.createElement('button');
+            thumbUp.className = 'feedback-btn';
+            thumbUp.innerHTML = '👍';
+            thumbUp.title = 'Good response';
+            const thumbDown = document.createElement('button');
+            thumbDown.className = 'feedback-btn';
+            thumbDown.innerHTML = '👎';
+            thumbDown.title = 'Bad response';
+
+            thumbUp.addEventListener('click', () => {
+                sendFeedback(appState.activeConversationId || '', text, 'good');
+                thumbUp.disabled = true;
+                thumbDown.disabled = true;
+                thumbUp.classList.add('selected');
+            });
+
+            thumbDown.addEventListener('click', () => {
+                sendFeedback(appState.activeConversationId || '', text, 'bad');
+                thumbUp.disabled = true;
+                thumbDown.disabled = true;
+                thumbDown.classList.add('selected');
+            });
+
+            feedbackControls.appendChild(thumbUp);
+            feedbackControls.appendChild(thumbDown);
+
+            controlsWrapper.appendChild(feedbackControls);
+            controlsWrapper.appendChild(speakButton); // Add speak button to the wrapper
+            messageContent.appendChild(controlsWrapper);
         }
-        // --- END OF NEW CODE ---
+        // --- END OF COMBINED CONTROLS ---
 
         if (sender === 'user') { 
             messageWrapper.appendChild(messageContent); 
@@ -347,6 +380,23 @@ export function renderAppPage(container: HTMLElement) {
         }
     }
 
+    // Add this new function inside renderAppPage
+    async function sendFeedback(convoId: string, msgText: string, rating: 'good' | 'bad') {
+        const { error } = await supabase
+            .from('message_feedback')
+            .insert({
+                conversation_id: convoId,
+                message_text: msgText,
+                rating: rating
+            });
+
+        if (error) {
+            console.error('Error saving feedback:', error);
+        }
+    }
+
+    // ...rest of
+
     // --- UPDATED ---
     async function deleteConversation(id: string) {
         if (!confirm(i18n.t('app_deleteConfirm'))) return;
@@ -418,20 +468,20 @@ export function renderAppPage(container: HTMLElement) {
         const userInput = messageInput.value.trim();
         if (!DIFY_API_KEY) { alert("Dify API Key is not configured."); return; }
         if (!userInput) return;
-        
+
         let activeConvo = appState.conversations.find(c => c.id === appState.activeConversationId);
-        if (!activeConvo) return; 
+        if (!activeConvo) return;
 
         // --- NEW LOGIC STARTS HERE ---
         if (activeConvo.id === 'new-chat-session' && !isGuestMode) {
-            appState.conversations.shift(); 
+            appState.conversations.shift();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data: newDbConvo, error } = await supabase
                     .from('conversations')
-                    .insert({ 
-                        user_id: user.id, 
-                        title: userInput.substring(0, 25) + (userInput.length > 25 ? '...' : ''), 
+                    .insert({
+                        user_id: user.id,
+                        title: userInput.substring(0, 25) + (userInput.length > 25 ? '...' : ''),
                         messages: [activeConvo.messages[0]]
                     })
                     .select()
@@ -457,7 +507,7 @@ export function renderAppPage(container: HTMLElement) {
 
         messageInput.value = '';
         await addMessageToActiveConversation({ sender: 'user', text: userInput });
-        
+
         displayMessage(i18n.t('app_thinking'), 'ai');
         const tempBubbles = chatWindow.querySelectorAll('.message-wrapper');
         const tempLastBubble = tempBubbles[tempBubbles.length - 1];
