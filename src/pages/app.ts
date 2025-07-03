@@ -489,9 +489,12 @@ export function renderAppPage(container: HTMLElement) {
     async function handleDocumentUpload(event: Event) {
         const target = event.target as HTMLInputElement;
         const file = target.files?.[0];
+
         if (!file) return;
+
         const user = auth.getSession()?.user;
         if (!user) {
+            // ... (your existing guest handling logic is fine)
             const guestNotice = chatWindow.querySelector('.guest-analysis-notice');
             if (!guestNotice) {
                 displayMessage("Sign in to analyze documents. This feature requires an account to keep your documents secure.", 'ai');
@@ -501,19 +504,21 @@ export function renderAppPage(container: HTMLElement) {
             target.value = '';
             return;
         }
+
         const processingMsg = `Processing document: **${file.name}**...`;
         displayMessage(processingMsg, 'ai');
         const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
+
         try {
-            const filePath = `${user.id}/${Date.now()}-${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('document-uploads').upload(filePath, file);
-            if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
-            const { data: urlData } = supabase.storage.from('document-uploads').getPublicUrl(filePath);
-            const publicURL = urlData.publicUrl;
+            // --- We will now do the Dify upload FIRST ---
+
+            // Step 1: Send the actual file to Dify to create a knowledge segment
             const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
+            
             const formData = new FormData();
-            formData.append('user', userIdentifier);
-            formData.append('url', publicURL);
+            formData.append('user', userIdentifier); // Dify requires the user identifier
+            formData.append('file', file); // <-- Send the raw file object
+
             const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
                 method: 'POST',
                 headers: {
@@ -521,11 +526,23 @@ export function renderAppPage(container: HTMLElement) {
                 },
                 body: formData,
             });
+
             if (!difyResponse.ok) {
-                let errorBody: any = {};
-                try { errorBody = await difyResponse.json(); } catch {}
+                const errorBody = await difyResponse.json();
                 throw new Error(`Dify API Error: ${errorBody.message || 'Failed to upload file to Dify'}`);
             }
+
+            // --- Dify part is successful, now upload to Supabase for our own records ---
+
+            // Step 2: Upload the file to Supabase Storage for long-term storage
+            const filePath = `${user.id}/${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('document-uploads').upload(filePath, file);
+            if (uploadError) {
+                // This is not a critical failure, as Dify has the file. We can just log it.
+                console.warn(`Supabase upload failed, but Dify succeeded: ${uploadError.message}`);
+            }
+            
+            // Step 3: Update the message to "Ready"
             const readyMsg = `Your document **${file.name}** is ready. Ask me anything about it.`;
             if (tempMessageWrapper) {
                 const bubbleContent = tempMessageWrapper.querySelector('.message-bubble');
@@ -538,6 +555,7 @@ export function renderAppPage(container: HTMLElement) {
                     }
                 }
             }
+            
         } catch (error) {
             const errorMessage = `Failed to process document. ${error instanceof Error ? error.message : 'Unknown error'}`;
             if (tempMessageWrapper) {
@@ -553,7 +571,7 @@ export function renderAppPage(container: HTMLElement) {
             }
             console.error(error);
         } finally {
-            target.value = '';
+            target.value = ''; // Clear the file input
         }
     }
 
