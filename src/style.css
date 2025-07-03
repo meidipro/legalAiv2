@@ -1203,6 +1203,37 @@ body {
     color: var(--text-primary);
 }
 
+/* Always show feedback and speaker icons in a row under the message bubble */
+.message-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    margin-left: 4px;
+}
+
+.speak-btn {
+    position: static; /* Remove absolute positioning */
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    opacity: 1; /* Always visible */
+    margin-left: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.speak-btn:hover {
+    background-color: var(--bg-soft);
+    color: var(--text-primary);
+}
+
 /* ADD THIS TO style.css */
 
 .feedback-controls {
@@ -1334,6 +1365,12 @@ body {
         width: 34px;
         height: 34px;
         bottom: 5px; /* Adjust vertical centering */
+    }
+    .upload-btn {
+        left: 45px; /* Position it next to the mic button */
+        width: 34px;
+        height: 34px;
+        bottom: 5px;
     }
 }@media (max-width: 900px) {
 
