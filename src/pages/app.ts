@@ -506,9 +506,9 @@ export function renderAppPage(container: HTMLElement) {
         const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
         try {
             const filePath = `${user.id}/${Date.now()}-${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('document_uploads').upload(filePath, file);
+            const { error: uploadError } = await supabase.storage.from('document-uploads').upload(filePath, file);
             if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
-            const { data: urlData } = supabase.storage.from('document_uploads').getPublicUrl(filePath);
+            const { data: urlData } = supabase.storage.from('document-uploads').getPublicUrl(filePath);
             const publicURL = urlData.publicUrl;
             const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
             const formData = new FormData();
