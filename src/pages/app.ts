@@ -100,6 +100,10 @@ export function renderAppPage(container: HTMLElement) {
           <div id="chat-window"></div>
           <div class="message-form-container">
               <form id="message-form">
+                  <button type="button" id="upload-doc-btn" class="upload-btn" title="Analyze a document">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                  </button>
+                  <input type="file" id="doc-file-input" style="display:none" accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.jpg,.jpeg,.png,.heic,.webp,.csv,.xlsx,.xls,.ppt,.pptx,.zip,.rar,.7z,.tar,.gz,.json,.xml,.eml,.msg,.md,.html,.htm,.epub,.mobi,.azw,.azw3,.fb2,.djvu,.cbz,.cbr,.mp3,.wav,.mp4,.mov,.avi,.mkv,.flv,.wmv,.ogg,.aac,.flac,.m4a,.webm,.ts,.m4v,.3gp,.3g2,.m2ts,.mts,.vob,.dat,.iso,.swf,.svg,.psd,.ai,.indd,.xd,.sketch,.fig,.blend,.dwg,.dxf,.stl,.obj,.fbx,.gltf,.glb,.3ds,.max,.c4d,.lwo,.lws,.ma,.mb,.ase,.aseprite,.spr,.sai,.clip,.kra,.ora,.psb,.tif,.tiff,.bmp,.ico,.icns,.cur,.ani,.exr,.hdr,.dds,.tga,.pal,.act,.thm,.yuv,.cin,.dpx,.rle,.sgi,.bw,.rgb,.rgba,.int,.inta,.sid,.pcx,.pict,.pct,.pic,.mac,.mag,.img,.sun,.ras,.xpm,.xbm,.ppm,.pgm,.pbm,.pnm,.pam,.j2k,.jp2,.jpf,.jpx,.jpm,.mj2,.svgz,.webp,.avif,.apng,.jxl,.heif,.heic,.pdf,.djvu,.xps,.oxps,.cbz,.cbr,.cbt,.cba,.cb7,.zip,.rar,.7z,.tar,.gz,.bz2,.xz,.lz,.lzma,.z,.tz,.tbz,.tgz,.txz,.tlz,.lz4,.lzo,.sz,.zst,.cab,.arj,.ace,.uue,.bz,.bzip2,.gzip,.lz,.lzma,.lzo,.rar,.xz,.z,.zip,.001,.7z,.ace,.alz,.apk,.arj,.bin,.bz2,.cab,.cpio,.deb,.dmg,.egg,.gz,.hqx,.img,.iso,.jar,.lzh,.lzma,.lzo,.msi,.pkg,.rar,.rpm,.sea,.sit,.tar,.tbz2,.tgz,.tlz,.txz,.war,.wim,.xar,.xz,.z,.zip,.zipx" />
                   <button type="button" id="mic-button" class="mic-btn" title="Ask with voice">
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
                   </button>
@@ -113,6 +117,8 @@ export function renderAppPage(container: HTMLElement) {
       <div id="overlay"></div>
   </div>`;
 
+    const uploadDocBtn = document.getElementById('upload-doc-btn') as HTMLButtonElement;
+    const docFileInput = document.getElementById('doc-file-input') as HTMLInputElement;
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
     const overlay = document.getElementById('overlay') as HTMLDivElement;
     const chatWindow = document.getElementById('chat-window') as HTMLDivElement;
@@ -226,7 +232,7 @@ export function renderAppPage(container: HTMLElement) {
 
         const messageBubble = document.createElement('div');
         messageBubble.className = 'message-bubble';
-        
+
         if (sender === 'ai') {
             const parsed = marked.parse(text, { gfm: true });
             if (parsed instanceof Promise) {
@@ -253,7 +259,7 @@ export function renderAppPage(container: HTMLElement) {
                 e.stopPropagation();
                 speakText(text);
             });
-            
+
             // Feedback Buttons
             const feedbackControls = document.createElement('div');
             feedbackControls.className = 'feedback-controls';
@@ -289,12 +295,12 @@ export function renderAppPage(container: HTMLElement) {
         }
         // --- END OF COMBINED CONTROLS ---
 
-        if (sender === 'user') { 
-            messageWrapper.appendChild(messageContent); 
-            messageWrapper.appendChild(avatar); 
-        } else { 
-            messageWrapper.appendChild(avatar); 
-            messageWrapper.appendChild(messageContent); 
+        if (sender === 'user') {
+            messageWrapper.appendChild(messageContent);
+            messageWrapper.appendChild(avatar);
+        } else {
+            messageWrapper.appendChild(avatar);
+            messageWrapper.appendChild(messageContent);
         }
         chatWindow.appendChild(messageWrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -392,6 +398,99 @@ export function renderAppPage(container: HTMLElement) {
 
         if (error) {
             console.error('Error saving feedback:', error);
+        }
+    }
+
+    // REPLACE your old handleDocumentUpload with this new, complete version
+
+    async function handleDocumentUpload(event: Event) {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+
+        if (!file) return;
+
+        const user = auth.getSession()?.user;
+        if (!user) {
+            // For guests, we can show a login prompt
+            const guestNotice = chatWindow.querySelector('.guest-analysis-notice');
+            if (!guestNotice) { // Prevent multiple notices
+                displayMessage("Sign in to analyze documents. This feature requires an account to keep your documents secure.", 'ai');
+                const newMsg = chatWindow.querySelector('.message-wrapper:last-child');
+                newMsg?.classList.add('guest-analysis-notice');
+            }
+            target.value = ''; // Clear file input
+            return;
+        }
+
+        const processingMsg = `Processing document: **${file.name}**...`;
+        displayMessage(processingMsg, 'ai');
+        const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
+
+        try {
+            // Step 1: Upload the file to Supabase Storage
+            const filePath = `${user.id}/${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('document_uploads').upload(filePath, file);
+            if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
+
+            // Step 2: Get the public URL of the uploaded file
+            const { data: urlData } = supabase.storage.from('document_uploads').getPublicUrl(filePath);
+            const publicURL = urlData.publicUrl;
+
+            // --- NEW: Step 3: Send the URL to Dify to create a knowledge segment ---
+            const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
+            
+            const formData = new FormData();
+            formData.append('user', userIdentifier); // Dify requires the user identifier
+            formData.append('url', publicURL); // Send the public URL of the file
+
+            const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${DIFY_API_KEY}`,
+                },
+                body: formData,
+            });
+
+            if (!difyResponse.ok) {
+                let errorBody: any = {};
+                try { errorBody = await difyResponse.json(); } catch {}
+                throw new Error(`Dify API Error: ${errorBody.message || 'Failed to upload file to Dify'}`);
+            }
+            
+            // Dify automatically uses this uploaded file as context for the next
+            // chat message in the same conversation.
+            
+            // Step 4: Update the message to "Ready"
+            const readyMsg = `Your document **${file.name}** is ready. Ask me anything about it.`;
+            if (tempMessageWrapper) {
+                const bubbleContent = tempMessageWrapper.querySelector('.message-bubble');
+                if (bubbleContent) {
+                    const parsed = marked.parse(readyMsg);
+                    if (parsed instanceof Promise) {
+                        parsed.then(html => { bubbleContent.innerHTML = html; });
+                    } else {
+                        bubbleContent.innerHTML = parsed;
+                    }
+                }
+            }
+            
+        } catch (error) {
+            const errorMessage = `Failed to process document. ${error instanceof Error ? error.message : 'Unknown error'}`;
+            if (tempMessageWrapper) {
+                const bubbleContent = tempMessageWrapper.querySelector('.message-bubble');
+                if (bubbleContent) {
+                    const parsed = marked.parse(errorMessage);
+                    if (parsed instanceof Promise) {
+                        parsed.then(html => { bubbleContent.innerHTML = html; });
+                    } else {
+                        bubbleContent.innerHTML = parsed;
+                    }
+                }
+            }
+            console.error(error);
+        } finally {
+            // Clear the file input so the user can upload the same file again
+            target.value = '';
         }
     }
 
@@ -687,6 +786,12 @@ export function renderAppPage(container: HTMLElement) {
                 i18n.setLanguage('bn');
             }
         });
+
+        // Add these listeners inside initApp()
+        uploadDocBtn.addEventListener('click', () => {
+            docFileInput.click(); // Open the file picker when the button is clicked
+        });
+        docFileInput.addEventListener('change', handleDocumentUpload);
     }
     initApp();
 }
