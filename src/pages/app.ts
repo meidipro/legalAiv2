@@ -313,18 +313,28 @@ export function renderAppPage(container: HTMLElement) {
         renderChatWindow();
         if (window.innerWidth <= 900) { sidebar.classList.remove('is-open'); overlay.classList.remove('is-open'); }
     }
+    
+    // --- FINAL, CORRECTED loadState FUNCTION ---
 
     async function loadState() {
         if (isGuestMode) {
             const savedState = localStorage.getItem(GUEST_STORAGE_KEY);
             appState = savedState ? JSON.parse(savedState) : { chats: [], activeChatId: null };
         } else {
-            const { data, error } = await supabase.from('chats').select('id, title').order('created_at', { ascending: false });
+            // VVV THIS IS THE FIX VVV
+            const { data, error } = await supabase
+                .from('chats')
+                .select('id, title, has_document') // <<< FIX: Request the new column
+                .order('created_at', { ascending: false });
+            // ^^^ THIS IS THE FIX ^^^
+
             if (error) {
                 console.error("Error fetching chats:", error);
                 appState = { chats: [], activeChatId: null };
                 return;
             }
+
+            // The spread operator `...c` will now correctly include the `has_document` property
             appState = { chats: data.map((c: any) => ({ ...c, messages: [] })), activeChatId: null };
         }
     }
