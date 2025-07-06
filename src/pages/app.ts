@@ -464,7 +464,11 @@ export function renderAppPage(container: HTMLElement) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    inputs: { /* You can add role/language here if needed */ },
+                    inputs: {
+                        "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
+                        "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
+                    },
+                    // ^^^ THIS IS THE FIX ^^^
                     query: userInput,
                     user: userIdentifier,
                     conversation_id: activeChat.dify_conversation_id || "",
