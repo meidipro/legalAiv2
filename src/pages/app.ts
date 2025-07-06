@@ -2,6 +2,9 @@ import { marked } from 'marked';
 import { supabase } from '../supabaseClient';
 import { auth } from '../auth';
 import { i18n } from '../i18n';
+import Tesseract from 'tesseract.js';
+import * as pdfjsLib from 'pdfjs-dist';
+import { franc } from 'franc-min';
 
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
@@ -490,88 +493,194 @@ export function renderAppPage(container: HTMLElement) {
         const target = event.target as HTMLInputElement;
         const file = target.files?.[0];
 
+        // --- Security & Privacy: File type and size validation ---
+        const allowedTypes = [
+            'application/pdf', 'image/jpeg', 'image/png', 'text/plain', 'text/markdown'
+        ];
+        const MAX_FILE_SIZE_MB = 10;
         if (!file) return;
-
-        const user = auth.getSession()?.user;
-        if (!user) {
-            // ... (your existing guest handling logic is fine)
-            const guestNotice = chatWindow.querySelector('.guest-analysis-notice');
-            if (!guestNotice) {
-                displayMessage("Sign in to analyze documents. This feature requires an account to keep your documents secure.", 'ai');
-                const newMsg = chatWindow.querySelector('.message-wrapper:last-child');
-                newMsg?.classList.add('guest-analysis-notice');
-            }
+        if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.md') && !file.name.toLowerCase().endsWith('.pdf')) {
+            displayMessage('Unsupported file type.', 'ai');
+            target.value = '';
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            displayMessage(`File too large. Max allowed is ${MAX_FILE_SIZE_MB}MB.`, 'ai');
             target.value = '';
             return;
         }
 
-        const processingMsg = `Processing document: **${file.name}**...`;
-        displayMessage(processingMsg, 'ai');
-        const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
+        // Check for user login
+        if (isGuestMode) {
+            if (!appState.activeChatId) await createNewChat();
+            const guestNotice = `Sign in to analyze documents. This feature requires an account to keep your documents secure.`;
+            addMessageToActiveChat({ sender: 'ai', content: guestNotice });
+            target.value = '';
+            return;
+        }
+
+        if (!appState.activeChatId) await createNewChat();
+
+        // Accessibility: Focus feedback for screen readers
+        const processingMsgWrapper = displayMessage(`Processing document: **${file.name}**...`, 'ai');
+        const processingMsgBubble = processingMsgWrapper.querySelector('.message-bubble');
+        processingMsgBubble?.setAttribute('aria-live', 'polite');
+        processingMsgBubble?.setAttribute('tabindex', '0');
 
         try {
-            // --- We will now do the Dify upload FIRST ---
+            let extractedText = '';
+            let detectedLang = 'eng';
 
-            // Step 1: Send the actual file to Dify to create a knowledge segment
+            // --- File Type Handling ---
+            if (file.type.startsWith('image/')) {
+                // Language Detection & OCR
+                const parsed = marked.parse(`Reading text from image **${file.name}**. This may take a moment...`);
+                if (parsed instanceof Promise) {
+                    parsed.then(html => { processingMsgBubble!.innerHTML = html; });
+                } else {
+                    processingMsgBubble!.innerHTML = parsed;
+                }
+                const ocrResult = await Tesseract.recognize(
+                    file,
+                    'eng+ben', // Add more languages if needed
+                    { logger: m => console.log(m) }
+                );
+                extractedText = ocrResult.data.text;
+                // Detect language from OCR result
+                const langCode = franc(extractedText);
+                if (langCode === 'ben') detectedLang = 'ben';
+
+            } else if (file.type.startsWith('text/') || file.name.endsWith('.md')) {
+                const parsedText = marked.parse(`Reading text from file **${file.name}**...`);
+                if (parsedText instanceof Promise) {
+                    parsedText.then(html => { processingMsgBubble!.innerHTML = html; });
+                } else {
+                    processingMsgBubble!.innerHTML = parsedText;
+                }
+                extractedText = await file.text();
+                // Detect language from text
+                const langCode = franc(extractedText);
+                if (langCode === 'ben') detectedLang = 'ben';
+
+            } else if (
+                file.type === 'application/pdf' ||
+                file.name.toLowerCase().endsWith('.pdf')
+            ) {
+                const parsedText = marked.parse(`Extracting text from PDF **${file.name}**...`);
+                if (parsedText instanceof Promise) {
+                    parsedText.then(html => { processingMsgBubble!.innerHTML = html; });
+                } else {
+                    processingMsgBubble!.innerHTML = parsedText;
+                }
+
+                // --- File Size & Page Limits ---
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const MAX_PDF_PAGES = 20;
+                if (pdf.numPages > MAX_PDF_PAGES) {
+                    displayMessage(`PDF too long. Only the first ${MAX_PDF_PAGES} pages will be processed.`, 'ai');
+                }
+                let pdfText = '';
+                for (let i = 1; i <= Math.min(pdf.numPages, MAX_PDF_PAGES); i++) {
+                    processingMsgBubble!.innerHTML = `Extracting page ${i} of ${pdf.numPages}...`;
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    let pageText = content.items.map((item: any) => item.str).join(' ');
+                    // --- Improve PDF Extraction: OCR fallback for scanned pages ---
+                    if (!pageText.trim()) {
+                        const viewport = page.getViewport({ scale: 2 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const context = canvas.getContext('2d');
+                        if (context) {
+                            await page.render({ canvasContext: context, viewport }).promise;
+                        }
+                        const ocrResult = await Tesseract.recognize(canvas, 'eng+ben', { logger: m => console.log(m) });
+                        pageText = ocrResult.data.text;
+                        canvas.remove();
+                    }
+                    pdfText += pageText + '\n';
+                }
+                extractedText = pdfText;
+                // Detect language from PDF text
+                const langCode = franc(extractedText);
+                if (langCode === 'ben') detectedLang = 'ben';
+
+            } else {
+                throw new Error(`Unsupported file type: ${file.type || file.name}. Please upload an image, PDF, or a text file.`);
+            }
+
+            if (!extractedText.trim()) {
+                throw new Error('No text could be extracted from the document.');
+            }
+
+            // --- Security & Privacy: Clear sensitive data ---
+            // (You can clear extractedText after upload if needed)
+
+            // 3. Create a new text file in memory from the extracted text
+            const textBlob = new Blob([extractedText], { type: 'text/plain' });
+            const textFile = new File([textBlob], `processed_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}.txt`, { type: 'text/plain' });
+
+            // 4. Upload the new in-memory TEXT file to Dify
+            const sendingText = marked.parse(`Sending extracted text to LegalAI...`);
+            if (sendingText instanceof Promise) {
+                sendingText.then(html => { processingMsgBubble!.innerHTML = html; });
+            } else {
+                processingMsgBubble!.innerHTML = sendingText;
+            }
+
             const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
-            
             const formData = new FormData();
-            formData.append('user', userIdentifier); // Dify requires the user identifier
-            formData.append('file', file); // <-- Send the raw file object
+            formData.append('user', userIdentifier);
+            formData.append('file', textFile);
 
             const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${DIFY_API_KEY}`,
-                },
+                headers: { 'Authorization': `Bearer ${DIFY_API_KEY}` },
                 body: formData,
             });
 
             if (!difyResponse.ok) {
                 const errorBody = await difyResponse.json();
-                throw new Error(`Dify API Error: ${errorBody.message || 'Failed to upload file to Dify'}`);
+                throw new Error(`Dify API Error: ${errorBody.code} - ${errorBody.message || 'Failed to upload processed text'}`);
             }
 
-            // --- Dify part is successful, now upload to Supabase for our own records ---
+            // Optional: Upload the ORIGINAL file to Supabase for your own records
+            const filePath = `${session?.user?.id}/${Date.now()}-${file.name}`;
+            await supabase.storage.from('document-uploads').upload(filePath, file);
 
-            // Step 2: Upload the file to Supabase Storage for long-term storage
-            const filePath = `${user.id}/${Date.now()}-${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('document-uploads').upload(filePath, file);
-            if (uploadError) {
-                // This is not a critical failure, as Dify has the file. We can just log it.
-                console.warn(`Supabase upload failed, but Dify succeeded: ${uploadError.message}`);
+            // 5. Success! Update the message to "Ready"
+            const readyMsg = `Your document **${file.name}** is ready. Detected language: **${detectedLang}**. Ask me anything about it.`;
+            const readyParsed = marked.parse(readyMsg);
+            if (readyParsed instanceof Promise) {
+                readyParsed.then(html => { processingMsgBubble!.innerHTML = html; });
+            } else {
+                processingMsgBubble!.innerHTML = readyParsed;
             }
-            
-            // Step 3: Update the message to "Ready"
-            const readyMsg = `Your document **${file.name}** is ready. Ask me anything about it.`;
-            if (tempMessageWrapper) {
-                const bubbleContent = tempMessageWrapper.querySelector('.message-bubble');
-                if (bubbleContent) {
-                    const parsed = marked.parse(readyMsg);
-                    if (parsed instanceof Promise) {
-                        parsed.then(html => { bubbleContent.innerHTML = html; });
-                    } else {
-                        bubbleContent.innerHTML = parsed;
-                    }
-                }
-            }
-            
+
+            // Accessibility: Focus the message for screen readers
+            (processingMsgBubble as HTMLElement | null)?.focus();
+
+            // Security: Clear sensitive data from memory
+            extractedText = '';
+
         } catch (error) {
             const errorMessage = `Failed to process document. ${error instanceof Error ? error.message : 'Unknown error'}`;
-            if (tempMessageWrapper) {
-                const bubbleContent = tempMessageWrapper.querySelector('.message-bubble');
-                if (bubbleContent) {
-                    const parsed = marked.parse(errorMessage);
-                    if (parsed instanceof Promise) {
-                        parsed.then(html => { bubbleContent.innerHTML = html; });
-                    } else {
-                        bubbleContent.innerHTML = parsed;
-                    }
+            if (processingMsgBubble) {
+                const parsedError = marked.parse(errorMessage);
+                if (parsedError instanceof Promise) {
+                    parsedError.then(html => { processingMsgBubble.innerHTML = html; });
+                } else {
+                    processingMsgBubble.innerHTML = parsedError;
                 }
+                (processingMsgBubble as HTMLElement).focus();
+            } else {
+                displayMessage(errorMessage, 'ai');
             }
             console.error(error);
         } finally {
-            target.value = ''; // Clear the file input
+            target.value = '';
         }
     }
 
