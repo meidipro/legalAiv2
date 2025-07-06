@@ -9,7 +9,7 @@ import { franc } from 'franc-min';
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
 interface Message { id?: number; sender: Sender; content: string; }
-interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; }
+interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; has_document?: boolean; }
 interface AppState { chats: Chat[]; activeChatId: string | null; }
 
 interface SpeechRecognitionEvent extends Event { results: SpeechRecognitionResultList; }
@@ -24,7 +24,8 @@ declare global {
 }
 
 export function renderAppPage(container: HTMLElement) {
-    const DIFY_API_KEY = import.meta.env.VITE_DIFY_API_KEY;
+    const DIFY_REVIEWER_API_KEY = import.meta.env.VITE_DIFY_REVIEWER_API_KEY;
+    const DIFY_GENERAL_API_KEY = import.meta.env.VITE_DIFY_GENERAL_API_KEY;
     const GUEST_STORAGE_KEY = 'legalAI.guestChats';
     const GUEST_USER_ID_KEY = 'legalAI.guestUserId';
 
@@ -425,42 +426,74 @@ export function renderAppPage(container: HTMLElement) {
         }
     }
 
+    // --- Updated handleFormSubmit with AI switching and all previous features ---
+
     async function handleFormSubmit() {
         const userInput = messageInput.value.trim();
-        if (!DIFY_API_KEY || !userInput) return;
+        if (!userInput) return;
         if (!appState.activeChatId) await createNewChat();
+
         const activeChat = getActiveChat();
         if (!activeChat) return;
+
+        // --- AI Switching: Use Reviewer or General API key based on chat type ---
+        const isDocumentChat = activeChat.has_document === true;
+        const DIFY_API_KEY_TO_USE = isDocumentChat
+            ? DIFY_REVIEWER_API_KEY
+            : DIFY_GENERAL_API_KEY;
+
+        if (!DIFY_API_KEY_TO_USE) {
+            const errorMsg = "Error: The AI for this mode is not configured. Please check API keys.";
+            console.error(errorMsg);
+            displayMessage(errorMsg, 'ai');
+            return;
+        }
+        // --- End of Switching Logic ---
+
         await addMessageToActiveChat({ sender: 'user', content: userInput });
         messageInput.value = '';
         displayMessage(i18n.t('app_thinking'), 'ai');
-        const tempBubbles = chatWindow.querySelectorAll('.message-wrapper');
-        const tempLastBubble = tempBubbles[tempBubbles.length - 1];
+        const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
+
         try {
             const DIFY_CHAT_URL = 'https://api.dify.ai/v1/chat-messages';
             const response = await fetch(DIFY_CHAT_URL, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': `Bearer ${DIFY_API_KEY_TO_USE}`,
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({
-                    inputs: { "USER_ROLE": "...", "LANGUAGE": "..." },
-                    query: userInput, user: userIdentifier,
-                    conversation_id: activeChat.dify_conversation_id || "", response_mode: 'streaming'
+                    inputs: { /* You can add role/language here if needed */ },
+                    query: userInput,
+                    user: userIdentifier,
+                    conversation_id: activeChat.dify_conversation_id || "",
+                    response_mode: 'streaming'
                 })
             });
-            if (!response.ok) { const errorBody = await response.text(); throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`); }
-            if (!response.body) { throw new Error("API response was successful but had no body."); }
-            if (tempLastBubble) tempLastBubble.remove();
-            const reader = response.body.getReader();
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+            }
+
+            tempMessageWrapper?.remove(); // Remove "thinking..."
+
+            const reader = response.body!.getReader();
             const decoder = new TextDecoder();
-            let done = false; let fullResponse = ""; let finalDifyId = activeChat.dify_conversation_id;
-            displayMessage("", 'ai');
-            const aiBubbles = chatWindow.querySelectorAll('.message-wrapper.ai .message-bubble');
-            const aiLastBubble = aiBubbles[aiBubbles.length - 1] as HTMLDivElement;
-            while (!done) {
-                const { value, done: readerDone } = await reader.read();
-                done = readerDone;
+            let fullResponse = "";
+            let finalDifyId = activeChat.dify_conversation_id;
+
+            const aiMessageWrapper = displayMessage("", 'ai');
+            const aiMessageBubble = aiMessageWrapper.querySelector('.message-bubble') as HTMLDivElement;
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
                 for (const line of lines) {
                     try {
                         const jsonStr = line.substring(6);
@@ -471,23 +504,27 @@ export function renderAppPage(container: HTMLElement) {
                             fullResponse += parsedJson.answer;
                             const parsedMarkdown = marked.parse(fullResponse, { gfm: true });
                             if (parsedMarkdown instanceof Promise) {
-                                parsedMarkdown.then(html => { aiLastBubble.innerHTML = html; });
+                                parsedMarkdown.then(html => { aiMessageBubble.innerHTML = html; });
                             } else {
-                                aiLastBubble.innerHTML = parsedMarkdown;
+                                aiMessageBubble.innerHTML = parsedMarkdown;
                             }
                             chatWindow.scrollTop = chatWindow.scrollHeight;
                         }
-                    } catch (e) { }
+                    } catch (e) { /* Ignore partial JSON errors */ }
                 }
             }
             await addMessageToActiveChat({ sender: 'ai', content: fullResponse }, finalDifyId);
+
         } catch (error) {
-            if (tempLastBubble) tempLastBubble.remove();
+            tempMessageWrapper?.remove();
             const errorMessage = `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}`;
             await addMessageToActiveChat({ sender: 'ai', content: errorMessage });
             speakText(errorMessage);
         }
     }
+
+    // --- Updated handleDocumentUpload for Legal Document Reviewer ---
+    // Keeps all previous document features: PDF OCR fallback, language detection, file size/page limits, accessibility, etc.
 
     async function handleDocumentUpload(event: Event) {
         const target = event.target as HTMLInputElement;
@@ -510,10 +547,10 @@ export function renderAppPage(container: HTMLElement) {
             return;
         }
 
-        // Check for user login
+        // Guest user logic
         if (isGuestMode) {
             if (!appState.activeChatId) await createNewChat();
-            const guestNotice = `Sign in to analyze documents. This feature requires an account to keep your documents secure.`;
+            const guestNotice = 'Sign in to analyze documents. This feature requires an account to keep your documents secure.';
             addMessageToActiveChat({ sender: 'ai', content: guestNotice });
             target.value = '';
             return;
@@ -533,32 +570,30 @@ export function renderAppPage(container: HTMLElement) {
 
             // --- File Type Handling ---
             if (file.type.startsWith('image/')) {
-                // Language Detection & OCR
-                const parsed = marked.parse(`Reading text from image **${file.name}**. This may take a moment...`);
-                if (parsed instanceof Promise) {
-                    parsed.then(html => { processingMsgBubble!.innerHTML = html; });
+                const parsedImageMsg = marked.parse(`Reading text from image **${file.name}**. This may take a moment...`);
+                if (parsedImageMsg instanceof Promise) {
+                    parsedImageMsg.then(html => { processingMsgBubble!.innerHTML = html; });
                 } else {
-                    processingMsgBubble!.innerHTML = parsed;
+                    processingMsgBubble!.innerHTML = parsedImageMsg;
                 }
                 const ocrResult = await Tesseract.recognize(
                     file,
-                    'eng+ben', // Add more languages if needed
+                    'eng+ben',
                     { logger: m => console.log(m) }
                 );
                 extractedText = ocrResult.data.text;
-                // Detect language from OCR result
+                // Language detection
                 const langCode = franc(extractedText);
                 if (langCode === 'ben') detectedLang = 'ben';
 
             } else if (file.type.startsWith('text/') || file.name.endsWith('.md')) {
-                const parsedText = marked.parse(`Reading text from file **${file.name}**...`);
-                if (parsedText instanceof Promise) {
-                    parsedText.then(html => { processingMsgBubble!.innerHTML = html; });
+                const parsedTextMsg = marked.parse(`Reading text from file **${file.name}**...`);
+                if (parsedTextMsg instanceof Promise) {
+                    parsedTextMsg.then(html => { processingMsgBubble!.innerHTML = html; });
                 } else {
-                    processingMsgBubble!.innerHTML = parsedText;
+                    processingMsgBubble!.innerHTML = parsedTextMsg;
                 }
                 extractedText = await file.text();
-                // Detect language from text
                 const langCode = franc(extractedText);
                 if (langCode === 'ben') detectedLang = 'ben';
 
@@ -566,14 +601,12 @@ export function renderAppPage(container: HTMLElement) {
                 file.type === 'application/pdf' ||
                 file.name.toLowerCase().endsWith('.pdf')
             ) {
-                const parsedText = marked.parse(`Extracting text from PDF **${file.name}**...`);
-                if (parsedText instanceof Promise) {
-                    parsedText.then(html => { processingMsgBubble!.innerHTML = html; });
+                const parsedPdfMsg = marked.parse(`Extracting text from PDF **${file.name}**...`);
+                if (parsedPdfMsg instanceof Promise) {
+                    parsedPdfMsg.then(html => { processingMsgBubble!.innerHTML = html; });
                 } else {
-                    processingMsgBubble!.innerHTML = parsedText;
+                    processingMsgBubble!.innerHTML = parsedPdfMsg;
                 }
-
-                // --- File Size & Page Limits ---
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const MAX_PDF_PAGES = 20;
@@ -586,7 +619,7 @@ export function renderAppPage(container: HTMLElement) {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
                     let pageText = content.items.map((item: any) => item.str).join(' ');
-                    // --- Improve PDF Extraction: OCR fallback for scanned pages ---
+                    // OCR fallback for scanned pages
                     if (!pageText.trim()) {
                         const viewport = page.getViewport({ scale: 2 });
                         const canvas = document.createElement('canvas');
@@ -603,7 +636,6 @@ export function renderAppPage(container: HTMLElement) {
                     pdfText += pageText + '\n';
                 }
                 extractedText = pdfText;
-                // Detect language from PDF text
                 const langCode = franc(extractedText);
                 if (langCode === 'ben') detectedLang = 'ben';
 
@@ -615,19 +647,16 @@ export function renderAppPage(container: HTMLElement) {
                 throw new Error('No text could be extracted from the document.');
             }
 
-            // --- Security & Privacy: Clear sensitive data ---
-            // (You can clear extractedText after upload if needed)
-
-            // 3. Create a new text file in memory from the extracted text
+            // Create a new text file in memory to send to Dify
             const textBlob = new Blob([extractedText], { type: 'text/plain' });
             const textFile = new File([textBlob], `processed_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}.txt`, { type: 'text/plain' });
 
-            // 4. Upload the new in-memory TEXT file to Dify
-            const sendingText = marked.parse(`Sending extracted text to LegalAI...`);
-            if (sendingText instanceof Promise) {
-                sendingText.then(html => { processingMsgBubble!.innerHTML = html; });
+            // Upload the new text file to Dify Reviewer app (IMPORTANT: use REVIEWER API KEY)
+            const parsedMsg = marked.parse(`Sending extracted text to Legal Document Reviewer...`);
+            if (parsedMsg instanceof Promise) {
+                parsedMsg.then(html => { processingMsgBubble!.innerHTML = html; });
             } else {
-                processingMsgBubble!.innerHTML = sendingText;
+                processingMsgBubble!.innerHTML = parsedMsg;
             }
 
             const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
@@ -637,7 +666,7 @@ export function renderAppPage(container: HTMLElement) {
 
             const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${DIFY_API_KEY}` },
+                headers: { 'Authorization': `Bearer ${DIFY_REVIEWER_API_KEY}` }, // Use the Reviewer app key
                 body: formData,
             });
 
@@ -646,18 +675,28 @@ export function renderAppPage(container: HTMLElement) {
                 throw new Error(`Dify API Error: ${errorBody.code} - ${errorBody.message || 'Failed to upload processed text'}`);
             }
 
+            // Mark chat as having a document
+            const activeChat = getActiveChat();
+            if (activeChat) {
+                activeChat.has_document = true;
+                if (!isGuestMode) await supabase.from('chats').update({ has_document: true }).eq('id', activeChat.id);
+            }
+
             // Optional: Upload the ORIGINAL file to Supabase for your own records
             const filePath = `${session?.user?.id}/${Date.now()}-${file.name}`;
             await supabase.storage.from('document-uploads').upload(filePath, file);
 
-            // 5. Success! Update the message to "Ready"
+            // Success! Update the message to "Ready"
             const readyMsg = `Your document **${file.name}** is ready. Detected language: **${detectedLang}**. Ask me anything about it.`;
-            const readyParsed = marked.parse(readyMsg);
-            if (readyParsed instanceof Promise) {
-                readyParsed.then(html => { processingMsgBubble!.innerHTML = html; });
+            const parsedReadyMsg = marked.parse(readyMsg);
+            if (parsedReadyMsg instanceof Promise) {
+                parsedReadyMsg.then(html => { processingMsgBubble!.innerHTML = html; });
             } else {
-                processingMsgBubble!.innerHTML = readyParsed;
+                processingMsgBubble!.innerHTML = parsedReadyMsg;
             }
+
+            // Save the "Ready" message so it persists on reload
+            await addMessageToActiveChat({ sender: 'ai', content: readyMsg });
 
             // Accessibility: Focus the message for screen readers
             (processingMsgBubble as HTMLElement | null)?.focus();
@@ -674,6 +713,7 @@ export function renderAppPage(container: HTMLElement) {
                 } else {
                     processingMsgBubble.innerHTML = parsedError;
                 }
+                await addMessageToActiveChat({ sender: 'ai', content: errorMessage });
                 (processingMsgBubble as HTMLElement).focus();
             } else {
                 displayMessage(errorMessage, 'ai');
