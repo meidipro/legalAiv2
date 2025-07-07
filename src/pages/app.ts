@@ -9,7 +9,7 @@ import { franc } from 'franc-min';
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
 interface Message { id?: number; sender: Sender; content: string; }
-interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; has_document?: boolean; }
+interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; has_document?: boolean;  dify_file_ids?: string[]; }
 interface AppState { chats: Chat[]; activeChatId: string | null; }
 
 interface SpeechRecognitionEvent extends Event { results: SpeechRecognitionResultList; }
@@ -445,45 +445,51 @@ export function renderAppPage(container: HTMLElement) {
 
         const activeChat = getActiveChat();
         if (!activeChat) return;
-
-        // --- AI Switching: Use Reviewer or General API key based on chat type ---
+        
+        // --- FIX: Link #1 - Select the correct AI ---
         const isDocumentChat = activeChat.has_document === true;
-        const DIFY_API_KEY_TO_USE = isDocumentChat
-            ? DIFY_REVIEWER_API_KEY
-            : DIFY_GENERAL_API_KEY;
+        const API_KEY = isDocumentChat ? DIFY_REVIEWER_API_KEY : DIFY_GENERAL_API_KEY;
 
-        if (!DIFY_API_KEY_TO_USE) {
+        if (!API_KEY) {
             const errorMsg = "Error: The AI for this mode is not configured. Please check API keys.";
             console.error(errorMsg);
             displayMessage(errorMsg, 'ai');
             return;
         }
-        // --- End of Switching Logic ---
 
         await addMessageToActiveChat({ sender: 'user', content: userInput });
         messageInput.value = '';
-        displayMessage(i18n.t('app_thinking'), 'ai');
-        const tempMessageWrapper = chatWindow.querySelector('.message-wrapper:last-child');
+        const tempMessageWrapper = displayMessage(i18n.t('app_thinking'), 'ai');
 
         try {
-            const DIFY_CHAT_URL = 'https://api.dify.ai/v1/chat-messages';
-            const response = await fetch(DIFY_CHAT_URL, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${DIFY_API_KEY_TO_USE}`,
-                    'Content-Type': 'application/json'
+            // --- FIX: Link #2 - Attach the file ID ---
+            let filesToAttach: object[] = [];
+            if (activeChat.dify_file_ids && activeChat.dify_file_ids.length > 0) {
+                filesToAttach = activeChat.dify_file_ids.map(id => ({
+                    type: "file",
+                    transfer_method: "local_file",
+                    upload_file_id: id,
+                }));
+                // CRUCIAL: Clear the ID after using it once
+                activeChat.dify_file_ids = [];
+            }
+            
+            const body = {
+                inputs: {
+                    "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
+                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
                 },
-                body: JSON.stringify({
-                    inputs: {
-                        "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
-                        "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
-                    },
-                    // ^^^ THIS IS THE FIX ^^^
-                    query: userInput,
-                    user: userIdentifier,
-                    conversation_id: activeChat.dify_conversation_id || "",
-                    response_mode: 'streaming'
-                })
+                query: userInput,
+                user: userIdentifier,
+                conversation_id: activeChat.dify_conversation_id || "",
+                response_mode: 'streaming',
+                files: filesToAttach // <-- This is the explicit link to the file!
+            };
+
+            const response = await fetch('https://api.dify.ai/v1/chat-messages', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
@@ -491,13 +497,12 @@ export function renderAppPage(container: HTMLElement) {
                 throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
             }
 
-            tempMessageWrapper?.remove(); // Remove "thinking..."
+            tempMessageWrapper.remove();
 
-            const reader = response.body!.getReader();
-            const decoder = new TextDecoder();
             let fullResponse = "";
             let finalDifyId = activeChat.dify_conversation_id;
-
+            const reader = response.body!.getReader();
+            const decoder = new TextDecoder();
             const aiMessageWrapper = displayMessage("", 'ai');
             const aiMessageBubble = aiMessageWrapper.querySelector('.message-bubble') as HTMLDivElement;
 
@@ -537,31 +542,13 @@ export function renderAppPage(container: HTMLElement) {
         }
     }
 
-    // --- Updated handleDocumentUpload for Legal Document Reviewer ---
+    // --- Updated handleDocumentUpload: links uploaded file to chat for Dify Reviewer ---
     // Keeps all previous document features: PDF OCR fallback, language detection, file size/page limits, accessibility, etc.
 
     async function handleDocumentUpload(event: Event) {
         const target = event.target as HTMLInputElement;
         const file = target.files?.[0];
-
-        // --- Security & Privacy: File type and size validation ---
-        const allowedTypes = [
-            'application/pdf', 'image/jpeg', 'image/png', 'text/plain', 'text/markdown'
-        ];
-        const MAX_FILE_SIZE_MB = 10;
         if (!file) return;
-        if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.md') && !file.name.toLowerCase().endsWith('.pdf')) {
-            displayMessage('Unsupported file type.', 'ai');
-            target.value = '';
-            return;
-        }
-        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-            displayMessage(`File too large. Max allowed is ${MAX_FILE_SIZE_MB}MB.`, 'ai');
-            target.value = '';
-            return;
-        }
-
-        // Guest user logic
         if (isGuestMode) {
             if (!appState.activeChatId) await createNewChat();
             const guestNotice = 'Sign in to analyze documents. This feature requires an account to keep your documents secure.';
@@ -572,17 +559,14 @@ export function renderAppPage(container: HTMLElement) {
 
         if (!appState.activeChatId) await createNewChat();
 
-        // Accessibility: Focus feedback for screen readers
         const processingMsgWrapper = displayMessage(`Processing document: **${file.name}**...`, 'ai');
         const processingMsgBubble = processingMsgWrapper.querySelector('.message-bubble');
-        processingMsgBubble?.setAttribute('aria-live', 'polite');
-        processingMsgBubble?.setAttribute('tabindex', '0');
 
         try {
             let extractedText = '';
-            let detectedLang = 'eng';
 
             // --- File Type Handling ---
+            let detectedLang = 'eng';
             if (file.type.startsWith('image/')) {
                 const parsedImageMsg = marked.parse(`Reading text from image **${file.name}**. This may take a moment...`);
                 if (parsedImageMsg instanceof Promise) {
@@ -689,19 +673,20 @@ export function renderAppPage(container: HTMLElement) {
                 throw new Error(`Dify API Error: ${errorBody.code} - ${errorBody.message || 'Failed to upload processed text'}`);
             }
 
+            // Extract uploaded file ID from Dify response
+            const difyResponseJson = await difyResponse.json();
+            const uploadedFileId = difyResponseJson.id;
+
             // Mark chat as having a document
             const activeChat = getActiveChat();
             if (activeChat) {
                 activeChat.has_document = true;
+                activeChat.dify_file_ids = [uploadedFileId];
                 if (!isGuestMode) await supabase.from('chats').update({ has_document: true }).eq('id', activeChat.id);
             }
 
-            // Optional: Upload the ORIGINAL file to Supabase for your own records
-            const filePath = `${session?.user?.id}/${Date.now()}-${file.name}`;
-            await supabase.storage.from('document-uploads').upload(filePath, file);
-
             // Success! Update the message to "Ready"
-            const readyMsg = `Your document **${file.name}** is ready. Detected language: **${detectedLang}**. Ask me anything about it.`;
+            const readyMsg = `Your document **${file.name}** is ready. Ask me anything about it.`;
             const parsedReadyMsg = marked.parse(readyMsg);
             if (parsedReadyMsg instanceof Promise) {
                 parsedReadyMsg.then(html => { processingMsgBubble!.innerHTML = html; });
