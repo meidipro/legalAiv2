@@ -470,8 +470,7 @@ export function renderAppPage(container: HTMLElement) {
                     transfer_method: "local_file",
                     upload_file_id: id,
                 }));
-                // CRUCIAL: Clear the ID after using it once
-                activeChat.dify_file_ids = [];
+                
             }
             
             const body = {
