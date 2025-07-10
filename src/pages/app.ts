@@ -479,19 +479,7 @@ export function renderAppPage(container: HTMLElement) {
                     "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
                     "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
                 },
-                let finalQuery = userInput;
-            if (isDocumentChat) {
-                // Heuristic: Prepend a phrase to guide the AI to analyze the document.
-                // A more robust solution involves Dify app prompt engineering.
-                finalQuery = `Regarding the uploaded document, ${userInput}`;
-            }
-
-            const body = {
-                inputs: {
-                    "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
-                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
-                },
-                query: finalQuery,
+                query: userInput,
                 user: userIdentifier,
                 conversation_id: activeChat.dify_conversation_id || "",
                 response_mode: 'streaming',
@@ -673,6 +661,7 @@ export function renderAppPage(container: HTMLElement) {
             const formData = new FormData();
             formData.append('user', userIdentifier);
             formData.append('file', textFile);
+            formData.append('lang', detectedLang);
 
             const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
                 method: 'POST',
