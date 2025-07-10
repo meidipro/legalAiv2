@@ -682,7 +682,8 @@ export function renderAppPage(container: HTMLElement) {
             if (activeChat) {
                 activeChat.has_document = true;
                 activeChat.dify_file_ids = [uploadedFileId];
-                if (!isGuestMode) await supabase.from('chats').update({ has_document: true }).eq('id', activeChat.id);
+                activeChat.dify_conversation_id = undefined; // Reset conversation ID for new document context
+                if (!isGuestMode) await supabase.from('chats').update({ has_document: true, dify_conversation_id: null }).eq('id', activeChat.id);
             }
 
             // Success! Update the message to "Ready"
