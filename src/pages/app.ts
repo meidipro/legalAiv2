@@ -2,9 +2,6 @@ import { marked } from 'marked';
 import { supabase } from '../supabaseClient';
 import { auth } from '../auth';
 import { i18n } from '../i18n';
-import Tesseract from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
-import { franc } from 'franc-min';
 import Groq from "groq-sdk";
 
 // --- Types matching your DB schema ---
@@ -574,191 +571,16 @@ ${msg.content}`).join('\n\n')}`;
 
     async function handleDocumentUpload(event: Event) {
         const target = event.target as HTMLInputElement;
-        const file = target.files?.[0];
-        if (!file) return;
-        if (isGuestMode) {
-            if (!appState.activeChatId) await createNewChat();
-            const guestNotice = 'Sign in to analyze documents. This feature requires an account to keep your documents secure.';
-            addMessageToActiveChat({ sender: 'ai', content: guestNotice });
-            target.value = '';
-            return;
-        }
+        target.value = ''; // Clear the file input immediately
 
         if (!appState.activeChatId) await createNewChat();
 
-        const processingMsgWrapper = displayMessage(`Processing document: **${file.name}**...`, 'ai');
-        const processingMsgBubble = processingMsgWrapper.querySelector('.message-bubble');
+        const message = i18n.t('app_documentFeatureComingSoon');
+        await addMessageToActiveChat({ sender: 'ai', content: message });
 
-        try {
-            let extractedText = '';
-
-            // --- File Type Handling ---
-            let detectedLang = 'eng';
-            if (file.type.startsWith('image/')) {
-                const parsedImageMsg = marked.parse(`Reading text from image **${file.name}**. This may take a moment...`);
-                if (parsedImageMsg instanceof Promise) {
-                    parsedImageMsg.then(html => { processingMsgBubble!.innerHTML = html; });
-                } else {
-                    processingMsgBubble!.innerHTML = parsedImageMsg;
-                }
-                const ocrResult = await Tesseract.recognize(
-                    file,
-                    'eng+ben',
-                    { logger: m => console.log(m) }
-                );
-                extractedText = ocrResult.data.text;
-                // Language detection
-                const langCode = franc(extractedText);
-                if (langCode === 'ben') detectedLang = 'ben';
-
-            } else if (file.type.startsWith('text/') || file.name.endsWith('.md')) {
-                const parsedTextMsg = marked.parse(`Reading text from file **${file.name}**...`);
-                if (parsedTextMsg instanceof Promise) {
-                    parsedTextMsg.then(html => { processingMsgBubble!.innerHTML = html; });
-                } else {
-                    processingMsgBubble!.innerHTML = parsedTextMsg;
-                }
-                extractedText = await file.text();
-                const langCode = franc(extractedText);
-                if (langCode === 'ben') detectedLang = 'ben';
-
-            } else if (
-                file.type === 'application/pdf' ||
-                file.name.toLowerCase().endsWith('.pdf')
-            ) {
-                const parsedPdfMsg = marked.parse(`Extracting text from PDF **${file.name}**...`);
-                if (parsedPdfMsg instanceof Promise) {
-                    parsedPdfMsg.then(html => { processingMsgBubble!.innerHTML = html; });
-                } else {
-                    processingMsgBubble!.innerHTML = parsedPdfMsg;
-                }
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const MAX_PDF_PAGES = 20;
-                if (pdf.numPages > MAX_PDF_PAGES) {
-                    displayMessage(`PDF too long. Only the first ${MAX_PDF_PAGES} pages will be processed.`, 'ai');
-                }
-                let pdfText = '';
-                for (let i = 1; i <= Math.min(pdf.numPages, MAX_PDF_PAGES); i++) {
-                    processingMsgBubble!.innerHTML = `Extracting page ${i} of ${pdf.numPages}...`;
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    let pageText = content.items.map((item: any) => item.str).join(' ');
-                    // OCR fallback for scanned pages
-                    if (!pageText.trim()) {
-                        const viewport = page.getViewport({ scale: 2 });
-                        const canvas = document.createElement('canvas');
-                        canvas.width = viewport.width;
-                        canvas.height = viewport.height;
-                        const context = canvas.getContext('2d');
-                        if (context) {
-                            await page.render({ canvasContext: context, viewport }).promise;
-                        }
-                        const ocrResult = await Tesseract.recognize(canvas, 'eng+ben', { logger: m => console.log(m) });
-                        pageText = ocrResult.data.text;
-                        canvas.remove();
-                    }
-                    pdfText += pageText + '\n';
-                }
-                extractedText = pdfText;
-                const langCode = franc(extractedText);
-                if (langCode === 'ben') detectedLang = 'ben';
-
-            } else {
-                throw new Error(`Unsupported file type: ${file.type || file.name}. Please upload an image, PDF, or a text file.`);
-            }
-
-            if (!extractedText.trim()) {
-                throw new Error('No text could be extracted from the document.');
-            }
-
-            // Create a new text file in memory to send to Dify
-            const textBlob = new Blob([extractedText], { type: 'text/plain' });
-            const textFile = new File([textBlob], `processed_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}.txt`, { type: 'text/plain' });
-
-            // Upload the new text file to Dify Reviewer app (IMPORTANT: use REVIEWER API KEY)
-            const parsedMsg = marked.parse(`Sending extracted text to Legal Document Reviewer...`);
-            if (parsedMsg instanceof Promise) {
-                parsedMsg.then(html => { processingMsgBubble!.innerHTML = html; });
-            } else {
-                processingMsgBubble!.innerHTML = parsedMsg;
-            }
-
-            const DIFY_FILE_UPLOAD_URL = 'https://api.dify.ai/v1/files/upload';
-            const formData = new FormData();
-            formData.append('user', userIdentifier);
-            formData.append('file', textFile);
-            formData.append('lang', detectedLang);
-
-            const difyResponse = await fetch(DIFY_FILE_UPLOAD_URL, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${DIFY_REVIEWER_API_KEY}` }, // Use the Reviewer app key
-                body: formData,
-            });
-
-            if (!difyResponse.ok) {
-                const errorBody = await difyResponse.json();
-                throw new Error(`Dify API Error: ${errorBody.code} - ${errorBody.message || 'Failed to upload processed text'}`);
-            }
-
-            // Extract uploaded file ID from Dify response
-            const difyResponseJson = await difyResponse.json();
-            const uploadedFileId = difyResponseJson.id;
-
-            // Mark chat as having a document and link the file
-            const activeChat = getActiveChat();
-            if (activeChat) {
-                activeChat.has_document = true;
-                activeChat.dify_file_ids = [uploadedFileId]; // Store the file ID
-                activeChat.dify_conversation_id = undefined; // Reset conversation for new context
-
-                // Explicitly link the file to the conversation for the next interaction
-                if (!isGuestMode) {
-                    await supabase.from('chats').update({
-                        has_document: true,
-                        dify_conversation_id: null, // Reset conversation ID
-                        // We can't store dify_file_ids directly if it's not in the schema,
-                        // but the front-end state is now correctly updated.
-                    }).eq('id', activeChat.id);
-                }
-            }
-
-            // Now, automatically send a query to Dify to trigger the summary
-            const initialQuery = "Summarize this document.";
-            const tempSummaryMessageWrapper = displayMessage(i18n.t('app_thinking'), 'ai'); // Display thinking message for summary
-            const { fullResponse: summaryResponse, finalDifyId: summaryDifyId } = await sendQueryToDify(
-                initialQuery,
-                activeChat?.dify_file_ids?.map(id => ({ type: "file", upload_file_id: id })) || [],
-                activeChat?.dify_conversation_id || "",
-                DIFY_REVIEWER_API_KEY,
-                tempSummaryMessageWrapper
-            );
-            await addMessageToActiveChat({ sender: 'ai', content: summaryResponse }, summaryDifyId);
-
-            // Accessibility: Focus the message for screen readers
-            (processingMsgBubble as HTMLElement | null)?.focus();
-
-            // Security: Clear sensitive data from memory
-            extractedText = '';
-
-        } catch (error) {
-            const errorMessage = `Failed to process document. ${error instanceof Error ? error.message : 'Unknown error'}`;
-            if (processingMsgBubble) {
-                const parsedError = marked.parse(errorMessage);
-                if (parsedError instanceof Promise) {
-                    parsedError.then(html => { processingMsgBubble.innerHTML = html; });
-                } else {
-                    processingMsgBubble.innerHTML = parsedError;
-                }
-                await addMessageToActiveChat({ sender: 'ai', content: errorMessage });
-                (processingMsgBubble as HTMLElement).focus();
-            } else {
-                displayMessage(errorMessage, 'ai');
-            }
-            console.error(error);
-        } finally {
-            target.value = '';
-        }
+        // Optional: You can add more engaging content here, e.g.,
+        // const engagingMessage = `Document analysis is a powerful feature we're fine-tuning! In the meantime, feel free to ask me general legal questions.`;
+        // await addMessageToActiveChat({ sender: 'ai', content: engagingMessage });
     }
 
     function renderUserProfileLink() {

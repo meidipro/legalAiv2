@@ -70,6 +70,7 @@ export const translations = {
     // --- App Page Modals / Prompts ---
     app_renameTitlePrompt: { en: 'Enter new title:', bn: 'নতুন শিরোনাম দিন:' },
     app_deleteConfirm: { en: 'Are you sure? This action cannot be undone.', bn: 'আপনি কি নিশ্চিত? এই কাজটি পূর্বাবস্থায় ফেরানো সম্ভব নয়।' },
+    app_documentFeatureComingSoon: { en: 'Document analysis feature is coming soon! Stay tuned for updates.', bn: 'ডকুমেন্ট বিশ্লেষণ ফিচার শীঘ্রই আসছে! আপডেটের জন্য সাথে থাকুন।' },
 
     // --- User Profile Page ---
     profile_title: { en: 'Your Profile', bn: 'আপনার প্রোফাইল' },
