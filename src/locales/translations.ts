@@ -14,6 +14,7 @@ export const translations = {
     landing_heroSubtitle: { en: `Get instant, clear answers to your legal questions. Whether you're a citizen, a law student, or a legal professional, LegalAI simplifies complexity.`, bn: 'আপনার আইনি জিজ্ঞাসার তাৎক্ষণিক ও সুস্পষ্ট উত্তর পান। নাগরিক, আইনের ছাত্র বা আইন পেশাজীবী, সকলের জন্য LegalAI আইনি জটিলতাকে সহজ করে তোলে।' },
     landing_cta_guest: { en: 'Try as Guest', bn: 'অতিথি হিসেবে দেখুন' },
     landing_cta_signup: { en: 'Sign Up for Full Features', bn: 'সম্পূর্ণ সুবিধা পেতে সাইন আপ করুন' },
+    landing_cta_goToApp: { en: 'Go to App', bn: 'অ্যাপে যান' },
     landing_featuresTitle: { en: 'A Tailored Experience for Everyone', bn: 'প্রত্যেকের জন্য বিশেষভাবে তৈরি' },
     landing_featuresSubtitle: { en: 'LegalAI understands your needs and adapts its responses to provide the most relevant and useful information for your role.', bn: 'LegalAI আপনার প্রয়োজন অনুযায়ী সবচেয়ে প্রাসঙ্গিক ও কার্যকরী তথ্য প্রদানের জন্য নিজেকে মানিয়ে নিতে সক্ষম।' },
     landing_feature1_title: { en: 'For the General Public', bn: 'সাধারণ মানুষের জন্য' },

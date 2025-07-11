@@ -24,7 +24,7 @@ declare global {
     }
 }
 
-export function renderAppPage(container: HTMLElement) {
+export async function renderAppPage(container: HTMLElement) {
     const DIFY_REVIEWER_API_KEY = import.meta.env.VITE_DIFY_REVIEWER_API_KEY;
     const DIFY_GENERAL_API_KEY = import.meta.env.VITE_DIFY_GENERAL_API_KEY;
     const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
@@ -418,7 +418,10 @@ export function renderAppPage(container: HTMLElement) {
     function shareChat(id: string, button: HTMLButtonElement) {
         const chat = appState.chats.find(c => c.id === id);
         if (!chat) return;
-        const formattedChat = `Chat: ${chat.title}\n\n` + chat.messages.map(msg => `${msg.sender === 'user' ? 'You' : 'LegalAI'}:\n${msg.content}`).join('\n\n');
+        const formattedChat = `Chat: ${chat.title}
+
+${chat.messages.map(msg => `${msg.sender === 'user' ? 'You' : 'LegalAI'}:
+${msg.content}`).join('\n\n')}`;
         navigator.clipboard.writeText(formattedChat).then(() => {
             const originalContent = button.innerHTML;
             button.innerHTML = '✅';
@@ -467,74 +470,22 @@ export function renderAppPage(container: HTMLElement) {
 
         try {
             // --- FIX: Link #2 - Attach the file ID ---
-            let filesToAttach: object[] = [];
+            let filesToAttach: { type: string; upload_file_id: string; }[] = [];
             if (activeChat.dify_file_ids && activeChat.dify_file_ids.length > 0) {
                 filesToAttach = activeChat.dify_file_ids.map(id => ({
                     type: "file",
-                    transfer_method: "local_file",
                     upload_file_id: id,
                 }));
                 
             }
             
-            const body = {
-                inputs: {
-                    "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
-                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
-                },
-                query: userInput,
-                user: userIdentifier,
-                conversation_id: activeChat.dify_conversation_id || "",
-                response_mode: 'streaming',
-                files: filesToAttach // <-- This is the explicit link to the file!
-            };
-
-            const response = await fetch('https://api.dify.ai/v1/chat-messages', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
-            }
-
-            tempMessageWrapper.remove();
-
-            let fullResponse = "";
-            let finalDifyId = activeChat.dify_conversation_id;
-            const reader = response.body!.getReader();
-            const decoder = new TextDecoder();
-            const aiMessageWrapper = displayMessage("", 'ai');
-            const aiMessageBubble = aiMessageWrapper.querySelector('.message-bubble') as HTMLDivElement;
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-
-                for (const line of lines) {
-                    try {
-                        const jsonStr = line.substring(6);
-                        if (jsonStr.trim() === '[DONE]') continue;
-                        const parsedJson = JSON.parse(jsonStr);
-                        if (parsedJson.conversation_id) finalDifyId = parsedJson.conversation_id;
-                        if (parsedJson.event === 'agent_message' || parsedJson.event === 'message') {
-                            fullResponse += parsedJson.answer;
-                            const parsedMarkdown = marked.parse(fullResponse, { gfm: true });
-                            if (parsedMarkdown instanceof Promise) {
-                                parsedMarkdown.then(html => { aiMessageBubble.innerHTML = html; });
-                            } else {
-                                aiMessageBubble.innerHTML = parsedMarkdown;
-                            }
-                            chatWindow.scrollTop = chatWindow.scrollHeight;
-                        }
-                    } catch (e) { /* Ignore partial JSON errors */ }
-                }
-            }
+            const { fullResponse, finalDifyId } = await sendQueryToDify(
+                userInput,
+                filesToAttach,
+                activeChat.dify_conversation_id || "",
+                API_KEY,
+                tempMessageWrapper
+            );
             await addMessageToActiveChat({ sender: 'ai', content: fullResponse }, finalDifyId);
 
             // Fallback to Groq if Dify provides no answer
@@ -550,13 +501,72 @@ export function renderAppPage(container: HTMLElement) {
                     throw new Error("Both Dify and Groq failed to provide a response.");
                 }
             }
-
         } catch (error) {
             tempMessageWrapper?.remove();
             const errorMessage = `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}`;
             await addMessageToActiveChat({ sender: 'ai', content: errorMessage });
             speakText(errorMessage);
         }
+    }
+
+    async function sendQueryToDify(query: string, files: Array<{ type: string; upload_file_id: string; }>, conversationId: string, apiKey: string, tempMessageWrapper: HTMLDivElement) {
+        const response = await fetch('https://api.dify.ai/v1/chat-messages', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                inputs: {
+                    "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
+                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
+                },
+                query: query,
+                user: userIdentifier,
+                conversation_id: conversationId,
+                response_mode: 'streaming',
+                files: files
+            })
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+        }
+
+        tempMessageWrapper.remove();
+
+        let fullResponse = "";
+        let finalDifyId = conversationId;
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        const aiMessageWrapper = displayMessage("", 'ai');
+        const aiMessageBubble = aiMessageWrapper.querySelector('.message-bubble') as HTMLDivElement;
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+            for (const line of lines) {
+                try {
+                    const jsonStr = line.substring(6);
+                    if (jsonStr.trim() === '[DONE]') continue;
+                    const parsedJson = JSON.parse(jsonStr);
+                    if (parsedJson.conversation_id) finalDifyId = parsedJson.conversation_id;
+                    if (parsedJson.event === 'agent_message' || parsedJson.event === 'message') {
+                        fullResponse += parsedJson.answer;
+                        const parsedMarkdown = marked.parse(fullResponse, { gfm: true });
+                        if (parsedMarkdown instanceof Promise) {
+                            parsedMarkdown.then(html => { aiMessageBubble.innerHTML = html; });
+                        } else {
+                            aiMessageBubble.innerHTML = parsedMarkdown;
+                        }
+                        chatWindow.scrollTop = chatWindow.scrollHeight;
+                    }
+                } catch (e) { /* Ignore partial JSON errors */ }
+            }
+        }
+        return { fullResponse, finalDifyId };
     }
 
     // --- Updated handleDocumentUpload: links uploaded file to chat for Dify Reviewer ---
@@ -713,17 +723,17 @@ export function renderAppPage(container: HTMLElement) {
                 }
             }
 
-            // Success! Update the message to "Ready"
-            const readyMsg = `Your document **${file.name}** is ready. Ask me anything about it.`;
-            const parsedReadyMsg = marked.parse(readyMsg);
-            if (parsedReadyMsg instanceof Promise) {
-                parsedReadyMsg.then(html => { processingMsgBubble!.innerHTML = html; });
-            } else {
-                processingMsgBubble!.innerHTML = parsedReadyMsg;
-            }
-
-            // Save the "Ready" message so it persists on reload
-            await addMessageToActiveChat({ sender: 'ai', content: readyMsg });
+            // Now, automatically send a query to Dify to trigger the summary
+            const initialQuery = "Summarize this document.";
+            const tempSummaryMessageWrapper = displayMessage(i18n.t('app_thinking'), 'ai'); // Display thinking message for summary
+            const { fullResponse: summaryResponse, finalDifyId: summaryDifyId } = await sendQueryToDify(
+                initialQuery,
+                activeChat?.dify_file_ids?.map(id => ({ type: "file", upload_file_id: id })) || [],
+                activeChat?.dify_conversation_id || "",
+                DIFY_REVIEWER_API_KEY,
+                tempSummaryMessageWrapper
+            );
+            await addMessageToActiveChat({ sender: 'ai', content: summaryResponse }, summaryDifyId);
 
             // Accessibility: Focus the message for screen readers
             (processingMsgBubble as HTMLElement | null)?.focus();
@@ -841,5 +851,5 @@ export function renderAppPage(container: HTMLElement) {
         uploadDocBtn.addEventListener('click', () => { docFileInput.click(); });
         docFileInput.addEventListener('change', handleDocumentUpload);
     }
-    initApp();
+    await initApp();
 }
