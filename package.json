@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.50.0",
     "@types/marked": "^5.0.2",
     "franc-min": "^6.2.0",
+    "groq-sdk": "^0.26.0",
     "marked": "^16.0.0",
     "pdfjs-dist": "^5.3.31",
     "tesseract.js": "^6.0.1"

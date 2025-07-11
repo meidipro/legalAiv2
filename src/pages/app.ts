@@ -5,6 +5,7 @@ import { i18n } from '../i18n';
 import Tesseract from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import { franc } from 'franc-min';
+import Groq from "groq-sdk";
 
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
@@ -26,8 +27,11 @@ declare global {
 export function renderAppPage(container: HTMLElement) {
     const DIFY_REVIEWER_API_KEY = import.meta.env.VITE_DIFY_REVIEWER_API_KEY;
     const DIFY_GENERAL_API_KEY = import.meta.env.VITE_DIFY_GENERAL_API_KEY;
+    const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
     const GUEST_STORAGE_KEY = 'legalAI.guestChats';
     const GUEST_USER_ID_KEY = 'legalAI.guestUserId';
+
+    const groq = new Groq({ apiKey: GROQ_API_KEY, dangerouslyAllowBrowser: true });
 
     let appState: AppState;
     const session = auth.getSession();
@@ -533,6 +537,20 @@ export function renderAppPage(container: HTMLElement) {
             }
             await addMessageToActiveChat({ sender: 'ai', content: fullResponse }, finalDifyId);
 
+            // Fallback to Groq if Dify provides no answer
+            if (!fullResponse.trim()) {
+                const groqResponse = await groq.chat.completions.create({
+                    messages: [{ role: "user", content: userInput }],
+                    model: "llama3-8b-8192"
+                });
+                const groqAnswer = groqResponse.choices[0]?.message?.content || "";
+                if (groqAnswer) {
+                    await addMessageToActiveChat({ sender: 'ai', content: groqAnswer });
+                } else {
+                    throw new Error("Both Dify and Groq failed to provide a response.");
+                }
+            }
+
         } catch (error) {
             tempMessageWrapper?.remove();
             const errorMessage = `${i18n.t('app_error')} ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -677,13 +695,22 @@ export function renderAppPage(container: HTMLElement) {
             const difyResponseJson = await difyResponse.json();
             const uploadedFileId = difyResponseJson.id;
 
-            // Mark chat as having a document
+            // Mark chat as having a document and link the file
             const activeChat = getActiveChat();
             if (activeChat) {
                 activeChat.has_document = true;
-                activeChat.dify_file_ids = [uploadedFileId];
-                activeChat.dify_conversation_id = undefined; // Reset conversation ID for new document context
-                if (!isGuestMode) await supabase.from('chats').update({ has_document: true, dify_conversation_id: null }).eq('id', activeChat.id);
+                activeChat.dify_file_ids = [uploadedFileId]; // Store the file ID
+                activeChat.dify_conversation_id = undefined; // Reset conversation for new context
+
+                // Explicitly link the file to the conversation for the next interaction
+                if (!isGuestMode) {
+                    await supabase.from('chats').update({
+                        has_document: true,
+                        dify_conversation_id: null, // Reset conversation ID
+                        // We can't store dify_file_ids directly if it's not in the schema,
+                        // but the front-end state is now correctly updated.
+                    }).eq('id', activeChat.id);
+                }
             }
 
             // Success! Update the message to "Ready"
