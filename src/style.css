@@ -1384,3 +1384,333 @@ body {
         bottom: 5px;
     }
 }
+
+/* ================================== */
+/* --- ABOUT PAGE STYLES (ENHANCED) --- */
+.about-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Hero */
+.about-hero {
+  text-align: center;
+  padding: 80px 20px;
+  background-color: var(--bg-soft);
+  border-radius: 16px;
+  margin-bottom: 60px;
+}
+.about-title {
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text; /* Added for compatibility */
+  -webkit-text-fill-color: transparent;
+}
+.about-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Section Layout */
+.about-section {
+  margin-bottom: 80px;
+}
+.section-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 48px;
+}
+
+/* Grids */
+.about-grid {
+  display: grid;
+  gap: 24px;
+}
+.about-grid.two-cols {
+  grid-template-columns: 1fr 1fr;
+}
+.about-grid.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Cards */
+.about-card {
+  background-color: var(--bg-soft);
+  padding: 32px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+.about-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+.about-card p {
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* Infographic */
+.infographic-step {
+  text-align: center;
+}
+.infographic-icon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+}
+
+/* Tech Stack */
+.tech-logos {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+.tech-logos img {
+  height: 40px;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+.tech-logos img:hover {
+  opacity: 1;
+}
+
+/* Team Section */
+.team-card {
+  background-color: var(--bg-soft);
+  padding: 30px;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.team-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+.team-photo {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 50%;
+  margin-bottom: 16px;
+}
+.team-role {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .about-grid.two-cols,
+  .about-grid.three-cols {
+    grid-template-columns: 1fr;
+  }
+  .tech-logos {
+    gap: 20px;
+  }
+}
+
+/* --- FAQ Section --- */
+.faq-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.faq-item {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 20px 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.faq-question::after {
+  content: '+';
+  font-size: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.faq-question.active::after {
+  transform: rotate(45deg);
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+  padding: 0 10px;
+}
+
+.faq-answer.visible {
+  max-height: 200px; /* Adjust as needed */
+  padding-bottom: 20px;
+}
+
+.faq-answer p {
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.final-cta-section {
+  text-align: center;
+  padding: 40px;
+}
+
+.final-cta-section p {
+  margin-bottom: 24px;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+
+
+
+/* ================================== */
+/* --- ABOUT PAGE STYLES (ENHANCED) --- */
+.about-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Hero */
+.about-hero {
+  text-align: center;
+  padding: 80px 20px;
+  background-color: var(--bg-soft);
+  border-radius: 16px;
+  margin-bottom: 60px;
+}
+.about-title {
+  font-size: clamp(2.2rem, 5vw, 3rem);
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text; /* Added for compatibility */
+  -webkit-text-fill-color: transparent;
+}
+.about-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Section Layout */
+.about-section {
+  margin-bottom: 80px;
+}
+.section-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 48px;
+}
+
+/* Grids */
+.about-grid {
+  display: grid;
+  gap: 24px;
+}
+.about-grid.two-cols {
+  grid-template-columns: 1fr 1fr;
+}
+.about-grid.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Cards */
+.about-card {
+  background-color: var(--bg-soft);
+  padding: 32px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+.about-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+.about-card p {
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* Infographic */
+.infographic-step {
+  text-align: center;
+}
+.infographic-icon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+}
+
+/* Tech Stack */
+.tech-logos {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+.tech-logos img {
+  height: 40px;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+}
+.tech-logos img:hover {
+  opacity: 1;
+}
+
+/* Team Section */
+.team-card {
+  background-color: var(--bg-soft);
+  padding: 30px;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.team-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+.team-photo {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 50%;
+  margin-bottom: 16px;
+}
+.team-role {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .about-grid.two-cols,
+  .about-grid.three-cols {
+    grid-template-columns: 1fr;
+  }
+  .tech-logos {
+    gap: 20px;
+  }
+}

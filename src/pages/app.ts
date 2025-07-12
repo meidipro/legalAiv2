@@ -7,7 +7,7 @@ import Groq from "groq-sdk";
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
 interface Message { id?: number; sender: Sender; content: string; }
-interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; has_document?: boolean;  dify_file_ids?: string[]; }
+interface Chat { id: string; title: string; messages: Message[]; dify_conversation_id?: string; has_document?: boolean; dify_file_ids?: string[]; }
 interface AppState { chats: Chat[]; activeChatId: string | null; }
 
 interface SpeechRecognitionEvent extends Event { results: SpeechRecognitionResultList; }
@@ -63,8 +63,8 @@ export async function renderAppPage(container: HTMLElement) {
                 <div class="sidebar-role-selector">
                     <label for="role-selector">${i18n.t('app_iAmA')}</label>
                     <select id="role-selector">
-                        <option value="General Public">${i18n.t('app_role_general')}</option>
-                        <option value="Law Student" selected>${i18n.t('app_role_student')}</option>
+                        <option value="General Public" selected>${i18n.t('app_role_general')}</option>
+                        <option value="Law Student">${i18n.t('app_role_student')}</option>
                         <option value="Legal Professional">${i18n.t('app_role_professional')}</option>
                     </select>
                 </div>
@@ -314,7 +314,7 @@ export async function renderAppPage(container: HTMLElement) {
         renderChatWindow();
         if (window.innerWidth <= 900) { sidebar.classList.remove('is-open'); overlay.classList.remove('is-open'); }
     }
-    
+
     // --- FINAL, CORRECTED loadState FUNCTION ---
 
     async function loadState() {
@@ -449,7 +449,7 @@ ${msg.content}`).join('\n\n')}`;
 
         const activeChat = getActiveChat();
         if (!activeChat) return;
-        
+
         // --- FIX: Link #1 - Select the correct AI ---
         const isDocumentChat = activeChat.has_document === true;
         const API_KEY = isDocumentChat ? DIFY_REVIEWER_API_KEY : DIFY_GENERAL_API_KEY;
@@ -473,9 +473,9 @@ ${msg.content}`).join('\n\n')}`;
                     type: "file",
                     upload_file_id: id,
                 }));
-                
+
             }
-            
+
             const { fullResponse, finalDifyId } = await sendQueryToDify(
                 userInput,
                 filesToAttach,
@@ -565,6 +565,9 @@ ${msg.content}`).join('\n\n')}`;
         }
         return { fullResponse, finalDifyId };
     }
+
+    
+
 
     // --- Updated handleDocumentUpload: links uploaded file to chat for Dify Reviewer ---
     // Keeps all previous document features: PDF OCR fallback, language detection, file size/page limits, accessibility, etc.

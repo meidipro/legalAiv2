@@ -44,7 +44,7 @@ export const translations = {
     // --- App Page Chat Window ---
     app_askAnything: { en: 'Ask anything...', bn: 'আপনার প্রশ্ন লিখুন...' },
     app_emptyChatTitle: { en: 'What can I help with?', bn: 'আমি আপনাকে কিভাবে সাহায্য করতে পারি?' },
-    app_initialGreeting: { en: 'Hello! What can I help you with today?', bn: 'নমস্কার! আজ আমি আপনাকে কিভাবে সাহায্য করতে পারি?' },
+    app_initialGreeting: { en: 'Peace be upon you! What can I help you with today?', bn: 'আস-সালামু আলাইকুম (ٱلسَّلَامُ عَلَيْكُمْ) ! আজ আমি আপনাকে কিভাবে সাহায্য করতে পারি?' },
     app_aiSenderName: { en: 'LegalAI', bn: 'লিগ্যালএআই' },
     app_thinking: { en: '...', bn: 'ভাবছে...' },
     app_error: { en: 'Sorry, an error occurred:', bn: 'দুঃখিত, একটি ত্রুটি ঘটেছে:' },
