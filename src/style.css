@@ -153,8 +153,9 @@ body {
 
 /* --- LANDING PAGE STYLES --- */
 .hero-section {
-    min-height: calc(100vh - 72px);
+    min-height: 100vh; /* Use full viewport height */
     display: flex;
+    flex-direction: column; /* Allow content to stack vertically */
     align-items: center;
     justify-content: center;
     background-color: var(--bg-soft);
@@ -162,6 +163,7 @@ body {
     padding: 40px 5%;
     position: relative;
     overflow: hidden;
+    padding-top: 72px; /* Account for fixed navbar */
 }
 
 #particles-js {
@@ -672,7 +674,7 @@ body {
 .message-wrapper {
     display: flex;
     gap: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     max-width: 85%;
     align-self: flex-start;
     animation: fadeIn 0.3s ease-out;
@@ -755,14 +757,14 @@ body {
 
 /* Add more vertical padding for better spacing */
 .message-bubble {
-    padding: 16px 20px;
+    padding: 12px 16px;
 }
 
 /* Style for the main headings (###) */
 .message-bubble h3 {
     font-size: 16px;
     font-weight: 700;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 8px; /* Adds space between emoji and text */
@@ -776,7 +778,7 @@ body {
 }
 
 .message-bubble li {
-    margin-bottom: 12px; /* Add space between list items */
+    margin-bottom: 8px; /* Add space between list items */
     line-height: 1.6;
 }
 
@@ -1094,68 +1096,7 @@ body {
     display: none;
 }
 
-@media (max-width: 900px) {
 
-    /* Hide desktop nav elements on mobile */
-    .navbar-left .nav-links,
-    .navbar-right {
-        display: none;
-    }
-
-    .navbar {
-        padding: 0 16px;
-        /* Adjust padding for mobile */
-    }
-
-    .navbar-left {
-        flex-grow: 1;
-    }
-
-    /* Show the hamburger menu on mobile */
-    #hamburger-menu {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* --- Sidebar Styles (Unchanged but included for context) --- */
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        height: 100vh;
-        transform: translateX(-100%);
-        z-index: 200;
-        box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.1);
-        border-right: none;
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .sidebar.is-open {
-        transform: translateX(0);
-    }
-
-    /* --- Overlay Styles (Unchanged but included for context) --- */
-    #overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 199;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease-in-out;
-    }
-
-    .sidebar.is-open~#overlay {
-        display: block;
-        opacity: 1;
-        pointer-events: all;
-    }
-}
 
 /* For screens 768px and wider, switch to a 2-column grid */
 @media (min-width: 768px) {
@@ -1276,19 +1217,84 @@ body {
 
 @media (max-width: 900px) {
 
-    /* --- 1. Main Layout & Scroll Behavior --- */
-    .main-content {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
+    /* Hide desktop nav elements on mobile */
+    .navbar-left .nav-links,
+    .navbar-right {
+        display: none;
     }
 
+    .navbar {
+        padding: 0 16px;
+        /* Adjust padding for mobile */
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
+
+    .navbar-left {
+        flex-grow: 1;
+    }
+
+    /* Show the hamburger menu on mobile */
+    #hamburger-menu {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* --- Sidebar Styles --- */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        transform: translateX(-100%); /* Hidden by default */
+        z-index: 200;
+        box-shadow: 4px 0px 15px rgba(0, 0, 0, 0.1);
+        border-right: none;
+        transition: transform 0.3s ease-in-out;
+        display: none; /* Ensure it's hidden initially */
+    }
+
+    .sidebar.is-open {
+        transform: translateX(0); /* Show when open */
+        display: flex; /* Ensure it's displayed when open */
+    }
+
+    /* --- Overlay Styles --- */
+    #overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 199;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .sidebar.is-open~#overlay {
+        display: block;
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    /* Adjust main-content padding-top to account for fixed navbar */
+    .main-content {
+        padding-top: 72px; /* Height of the navbar */
+    }
+
+    /* --- 1. Main Layout & Scroll Behavior --- */
     #chat-window {
         flex-grow: 1;
         overflow-y: auto;
         padding: 16px 12px;
         /* Adds a final message "buffer" at the bottom */
-        padding-bottom: 24px; 
+        padding-bottom: 80px; 
     }
 
     /* --- 2. Message Bubble Refinements --- */
@@ -1341,6 +1347,11 @@ body {
         border-top: 1px solid var(--border-color);
         padding: 10px 12px 12px 12px; /* Fine-tune padding */
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
     }
     .dark-mode .message-form-container {
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
@@ -1348,7 +1359,7 @@ body {
 
     #message-input {
         border-radius: 20px;
-        padding: 11px 48px 11px 48px;
+        padding: 11px 48px 11px 90px;
         font-size: 16px;
         box-shadow: none;
         border-color: var(--border-color);
@@ -1365,78 +1376,6 @@ body {
         width: 34px;
         height: 34px;
         bottom: 5px; /* Adjust vertical centering */
-    }
-    .upload-btn {
-        left: 45px; /* Position it next to the mic button */
-        width: 34px;
-        height: 34px;
-        bottom: 5px;
-    }
-}@media (max-width: 900px) {
-
-    /* --- 1. Fix the Main Layout --- */
-    /* Make the main content area a flex column that fills the height */
-    .main-content {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Make the chat window the scrollable area that takes up available space */
-    #chat-window {
-        flex-grow: 1;
-        overflow-y: auto;
-        padding: 16px 12px; /* Add some side padding */
-    }
-
-    /* --- 2. Fix the Message Bubbles --- */
-    /* Prevent bubbles from touching the screen edge */
-    .message-wrapper {
-        max-width: 90%;
-        gap: 8px;
-    }
-    
-    /* Ensure AI response text is left-aligned */
-    .message-bubble {
-        text-align: left;
-    }
-    .message-bubble h3,
-    .message-bubble p,
-    .message-bubble li {
-        text-align: left;
-    }
-
-    /* --- 3. Fix the Input Form (The Biggest Change) --- */
-    /* Make the form container "sticky" at the bottom */
-    .message-form-container {
-        flex-shrink: 0; /* Prevent it from shrinking */
-        background: var(--bg-main); /* Give it a solid background */
-        border-top: 1px solid var(--border-color);
-        padding: 12px;
-        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-    }
-    .dark-mode .message-form-container {
-        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    /* Make the input field pill-shaped */
-    #message-input {
-        border-radius: 24px;
-        padding: 12px 48px 12px 85px; /* Adjust padding for icons */
-        font-size: 16px;
-        box-shadow: none; /* Remove the old shadow */
-    }
-
-    /* Adjust icon positions for the new pill shape */
-    #send-button {
-        right: 6px;
-        width: 36px;
-        height: 36px;
-    }
-    .mic-btn {
-        left: 6px;
-        width: 36px;
-        height: 36px;
     }
     .upload-btn {
         left: 45px; /* Position it next to the mic button */
