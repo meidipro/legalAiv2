@@ -4,6 +4,8 @@ import { auth } from '../auth';
 import { i18n } from '../i18n';
 import Groq from "groq-sdk";
 
+import mermaid from 'mermaid';
+
 // --- Types matching your DB schema ---
 type Sender = 'user' | 'ai';
 interface Message { id?: number; sender: Sender; content: string; }
@@ -200,7 +202,7 @@ export async function renderAppPage(container: HTMLElement) {
     }
 
     function displayMessage(text: string, sender: Sender): HTMLDivElement {
-        if (!chatWindow) return document.createElement('div'); // Return an empty div if chatWindow is not found
+        if (!chatWindow) return document.createElement('div');
 
         const messageWrapper = document.createElement('div');
         messageWrapper.className = `message-wrapper ${sender}`;
@@ -225,15 +227,55 @@ export async function renderAppPage(container: HTMLElement) {
         const messageBubble = document.createElement('div');
         messageBubble.className = 'message-bubble';
 
+        // --- NEW: Logic to parse follow-up questions ---
+        let mainContent = text;
+        let followUpQuestions: string[] = [];
+        const followUpRegex = /<h4>Follow-up Suggestions:<\/h4>\s*<ol>(.*?)<\/ol>/s;
+        const match = text.match(followUpRegex);
+
+        if (match) {
+            mainContent = text.replace(followUpRegex, '').trim();
+            const listItemsRegex = /<li>(.*?)<\/li>/g;
+            let itemMatch;
+            while ((itemMatch = listItemsRegex.exec(match[1])) !== null) {
+                followUpQuestions.push(itemMatch[1]);
+            }
+        }
+        // --- END of new logic ---
+
         if (sender === 'ai') {
-            const parsed = marked.parse(text, { gfm: true });
+            const parsed = marked.parse(mainContent, { gfm: true });
             if (parsed instanceof Promise) {
-                parsed.then(html => { messageBubble.innerHTML = html; });
+                parsed.then(html => {
+                    messageBubble.innerHTML = html;
+                    messageBubble.querySelectorAll('.language-mermaid').forEach(async (el) => {
+                        if (el instanceof HTMLElement) {
+                            try {
+                                const { svg } = await mermaid.render(el.id, el.textContent || '');
+                                el.innerHTML = svg;
+                            } catch (e) {
+                                el.innerHTML = `Error rendering Mermaid diagram: ${e instanceof Error ? e.message : e}`;
+                            }
+                        }
+                    });
+                });
             } else {
                 messageBubble.innerHTML = parsed;
+                messageBubble.querySelectorAll('.language-mermaid').forEach(async (el) => {
+                    if (el instanceof HTMLElement) {
+                        const uniqueId = `mermaid-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                        el.id = uniqueId;
+                        try {
+                            const { svg } = await mermaid.render(uniqueId, el.textContent || '');
+                            el.innerHTML = svg;
+                        } catch (e) {
+                            el.innerHTML = `Error rendering Mermaid diagram: ${e instanceof Error ? e.message : e}`;
+                        }
+                    }
+                });
             }
         } else {
-            messageBubble.innerText = text;
+            messageBubble.innerText = mainContent;
         }
         messageContent.appendChild(messageBubble);
 
@@ -242,7 +284,6 @@ export async function renderAppPage(container: HTMLElement) {
             const controlsWrapper = document.createElement('div');
             controlsWrapper.className = 'message-controls';
 
-            // Feedback Buttons
             const feedbackControls = document.createElement('div');
             feedbackControls.className = 'feedback-controls';
             const thumbUp = document.createElement('button');
@@ -271,21 +312,19 @@ export async function renderAppPage(container: HTMLElement) {
             feedbackControls.appendChild(thumbUp);
             feedbackControls.appendChild(thumbDown);
 
-            // Speaker Button
             const speakButton = document.createElement('button');
             speakButton.className = 'speak-btn';
             speakButton.title = 'Read this message aloud';
             speakButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
             speakButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                speakText(text);
+                speakText(mainContent); // Speak only the main content
             });
 
             controlsWrapper.appendChild(feedbackControls);
             controlsWrapper.appendChild(speakButton);
             messageContent.appendChild(controlsWrapper);
         }
-        // --- END OF CONTROLS ---
 
         if (sender === 'user') {
             messageWrapper.appendChild(messageContent);
@@ -295,9 +334,24 @@ export async function renderAppPage(container: HTMLElement) {
             messageWrapper.appendChild(messageContent);
         }
         chatWindow.appendChild(messageWrapper);
+
+        // --- NEW: Render follow-up questions ---
+        if (followUpQuestions.length > 0) {
+            const followUpContainer = document.createElement('div');
+            followUpContainer.className = 'follow-up-container';
+            followUpQuestions.forEach(question => {
+                const button = document.createElement('button');
+                button.className = 'follow-up-question';
+                button.textContent = question;
+                followUpContainer.appendChild(button);
+            });
+            chatWindow.appendChild(followUpContainer);
+        }
+        // --- END of new rendering ---
+
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
-        return messageWrapper; // Return the created element
+        return messageWrapper;
     }
 
     async function setActiveChat(id: string | null) {
@@ -513,7 +567,8 @@ ${msg.content}`).join('\n\n')}`;
             body: JSON.stringify({
                 inputs: {
                     "LANGUAGE": i18n.getLanguage() === 'bn' ? 'Bengali' : 'English',
-                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value
+                    "USER_ROLE": (document.getElementById('role-selector') as HTMLSelectElement).value,
+                    "QUERY": query
                 },
                 query: query,
                 user: userIdentifier,
@@ -572,18 +627,94 @@ ${msg.content}`).join('\n\n')}`;
     // --- Updated handleDocumentUpload: links uploaded file to chat for Dify Reviewer ---
     // Keeps all previous document features: PDF OCR fallback, language detection, file size/page limits, accessibility, etc.
 
-    async function handleDocumentUpload(event: Event) {
+        async function handleDocumentUpload(event: Event) {
         const target = event.target as HTMLInputElement;
-        target.value = ''; // Clear the file input immediately
+        const file = target.files?.[0];
+        if (!file) return;
 
-        if (!appState.activeChatId) await createNewChat();
+        // --- UI: Show loading state ---
+        const sendButton = document.getElementById('send-button') as HTMLButtonElement;
+        const messageInput = document.getElementById('message-input') as HTMLInputElement;
+        const originalButtonContent = sendButton.innerHTML;
+        sendButton.innerHTML = `<div class="loader"></div>`; // Simple CSS loader
+        sendButton.disabled = true;
+        messageInput.disabled = true;
+        messageInput.placeholder = "Uploading document...";
 
-        const message = i18n.t('app_documentFeatureComingSoon');
-        await addMessageToActiveChat({ sender: 'ai', content: message });
+        if (!appState.activeChatId) {
+            await createNewChat();
+        }
+        const activeChat = getActiveChat();
+        if (!activeChat) {
+            // Handle error: reset UI
+            sendButton.innerHTML = originalButtonContent;
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+            messageInput.placeholder = i18n.t('app_askAnything');
+            return;
+        }
 
-        // Optional: You can add more engaging content here, e.g.,
-        // const engagingMessage = `Document analysis is a powerful feature we're fine-tuning! In the meantime, feel free to ask me general legal questions.`;
-        // await addMessageToActiveChat({ sender: 'ai', content: engagingMessage });
+        try {
+            const formData = new FormData();
+            formData.append('user', userIdentifier);
+            formData.append('file', file);
+
+            // 1. Upload the file to Dify
+            console.log("Attempting Dify file upload...");
+            const uploadResponse = await fetch('https://api.dify.ai/v1/files/upload', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${DIFY_REVIEWER_API_KEY}` },
+                body: formData,
+            });
+
+            console.log("Dify upload response status:", uploadResponse.status, uploadResponse.statusText);
+
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json();
+                console.error("Dify upload error details:", errorData);
+                throw new Error(`Dify upload failed: ${errorData.message || 'Unknown error'}`);
+            }
+
+            const uploadResult = await uploadResponse.json();
+            const fileId = uploadResult.id;
+
+            // 2. Update chat state with the new file ID
+            activeChat.has_document = true;
+            if (!activeChat.dify_file_ids) {
+                activeChat.dify_file_ids = [];
+            }
+            activeChat.dify_file_ids.push(fileId);
+
+            // 3. Persist the state change
+            if (isGuestMode) {
+                localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(appState));
+            } else {
+                await supabase
+                    .from('chats')
+                    .update({ 
+                        has_document: true, 
+                        dify_file_ids: activeChat.dify_file_ids 
+                    })
+                    .eq('id', activeChat.id);
+            }
+            
+            // 4. Notify the user
+            const successMessage = `📄 **${file.name}** has been uploaded successfully. You can now ask questions about this document.`;
+            await addMessageToActiveChat({ sender: 'ai', content: successMessage });
+            renderSidebar(); // Re-render sidebar to show potential document icon
+
+        } catch (error) {
+            console.error("Document upload error:", error);
+            const errorMessage = `Error uploading document: ${error instanceof Error ? error.message : 'Please try again.'}`;
+            await addMessageToActiveChat({ sender: 'ai', content: errorMessage });
+        } finally {
+            // --- UI: Reset loading state ---
+            target.value = ''; // Clear the file input
+            sendButton.innerHTML = originalButtonContent;
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+            messageInput.placeholder = i18n.t('app_askAnything');
+        }
     }
 
     function renderUserProfileLink() {
@@ -598,6 +729,7 @@ ${msg.content}`).join('\n\n')}`;
     }
 
     async function initApp() {
+        mermaid.initialize({ startOnLoad: false });
         function setupSpeechRecognition() {
             if (!recognition) {
                 if (micButton) micButton.style.display = 'none';
@@ -643,8 +775,13 @@ ${msg.content}`).join('\n\n')}`;
         chatWindow.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
             const queryItem = target.closest('.suggested-query-item');
+            const followUpItem = target.closest('.follow-up-question');
+
             if (queryItem && queryItem.textContent) {
                 messageInput.value = queryItem.textContent;
+                handleFormSubmit();
+            } else if (followUpItem && followUpItem.textContent) {
+                messageInput.value = followUpItem.textContent;
                 handleFormSubmit();
             }
         });
